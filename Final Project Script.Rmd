@@ -1,0 +1,79 @@
+---
+title: "Final Project Script"
+output: html_document
+date: "2024-11-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup}
+# Clear workspace of all objects and unload non-base packages
+rm(list = ls(all = TRUE))
+if (!is.null(sessionInfo()$otherPkgs)) {
+    suppressWarnings(
+        lapply(paste('package:', names(sessionInfo()$otherPkgs), sep=""),
+               detach, character.only=TRUE, unload=TRUE, force=TRUE)
+    )
+}
+
+# Load or install 'pacman' for package management
+my_repo <- 'http://cran.r-project.org'
+if (!require("pacman")) {
+    install.packages("pacman", repos = my_repo)
+}
+
+# **SPH server**: need to install rnaturalearthhires like so on the SPH server
+if (!require("rnaturalearthhires")) {
+    install.packages("rnaturalearthhires", repos = "https://ropensci.r-universe.dev", type = "source")
+}
+
+pacman::p_load(
+    tidyverse,                 # Data manipulation and visualization
+    # takes a while to install on SPH
+    ggspatial,                 # Geospatial extensions for ggplot.  
+    maptiles, # maptiles and tmap libraries can be used instead of or in combination with ggplot + ggspatial. maptiles offers more tile-based map flexibility; ggspatial provides the ability to annotate maps easily; tmap offers both static and interactive maps that we won't review in this course. 
+    terra, # alternative mapping with raster files
+    
+    # need for SPH server?
+    prettymapr,
+    
+    rnaturalearth,             # Land features for map layers (remove water locations)
+    rnaturalearthhires,        # High-resolution land features 
+    sf,                        # Handling spatial objects (modern replacement for 'sp')
+    knitr,                     # Formatting tables with kable()
+    gstat,                     # Geostatistical methods (e.g., kriging)
+    Hmisc,                     # Data description functions like describe()
+    scales,                    # Color scale customization for ggplot
+    akima,                     # Bivariate interpolation for irregular data
+    downloader                 # Downloading files over HTTP/HTTPS
+)
+
+
+```
+
+```{r}
+getwd()
+
+annual_data <- read_csv("annual_data_and_predictions.csv")
+
+census_shapefile <- st_read("cb_2019_53_tract_500k.shp")
+
+grid_covariates <- read_csv("dr0311_grid_covariates.csv")
+
+mobile_covariates <- read_csv("dr0311_mobile_covariates.csv")
+
+stop_data <- read_csv("stop_data.csv")
+```
+```{r data.cleaning}
+colnames(stop_data)
+stop_clean <- stop_data %>% 
+  filter(variable == "no2" | variable == "pmdisc_number") %>%
+  select(c(runname, time, location, stop_id, instrument_id, variable, mean_value, median_value))
+
+
+table(stop_clean$runname)
+
+```
+
