@@ -1,0 +1,14 @@
+---
+title: "Final Project Script"
+output: html_document
+date: "2024-11-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+pacman
+```
+
