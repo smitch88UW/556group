@@ -1,24 +1,14 @@
 ---
 title: "Final Project Script"
-output: html_document
-date: "2024-11-18"
+output: html_document:
+  toc: true
+  toc_float: true
+  toc_collapsed: true
+toc_depth: 3
+date: "2024-11-21"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
----
-title: "Final Project Script"
-output: html_document
-date: "2024-11-18"
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-<<<<<<< HEAD
+# Set-up and load data
 ```{r setup}
 # Clear workspace of all objects and unload non-base packages
 rm(list = ls(all = TRUE))
@@ -61,10 +51,9 @@ pacman::p_load(
     downloader                 # Downloading files over HTTP/HTTPS
 )
 
-
 ```
 
-```{r}
+```{r load.data}
 getwd()
 
 annual_data <- read_csv("annual_data_and_predictions.csv")
@@ -77,14 +66,77 @@ mobile_covariates <- read_csv("dr0311_mobile_covariates.csv")
 
 stop_data <- read_csv("stop_data.csv")
 ```
+
+# Clean data
+
+We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data and the annual data. We obtained Census shapefile data from the Census Bureau's website for Washington, and only kept those within King, Snohomish, Pierce, and Kitsap counties (*might not need Kitsap but I didn't want to open the map to check*). We linked data using the 6-digit tract code.
+
+Still TO-DO: are we selecting only covariates from Mercer et al? There are currently 887 covariates, we definitely need to pare down, just not sure if we want to add any others.
+
 ```{r data.cleaning}
+# stop data
 colnames(stop_data)
 stop_clean <- stop_data %>% 
-  filter(variable == "no2" | variable == "pmdisc_number") %>%
+  filter(variable == "no2" | variable == "neph_bscat") %>%
   select(c(runname, time, location, stop_id, instrument_id, variable, mean_value, median_value))
-
 
 table(stop_clean$runname)
 
+# annual data
+glimpse(annual_data)
+table(annual_data$variable)
+# keep only NO2 and PM, get rid of annual variable since they are all mean_of_win_medians
+annual_clean <- annual_data %>% 
+  filter(variable == "no2" | variable == "neph_bscat") %>%
+  select(-c(annual))
 
+# census data
+glimpse(census_shapefile)
+table(census_shapefile$COUNTYFP) # there are 39 counties, we don't need them all 
+# only keep King (033), Snohomish (061), Pierce (053), Kitsap (035)
+# get rid of LSAD and STATEFP since they are all the same
+census_clean <- census_shapefile %>%
+  filter(COUNTYFP %in% c("033", "061", "053", "035")) %>%
+  select(-c(LSAD,STATEFP))
+
+# grid covar
+glimpse(grid_covariates)
+# create 6 digit TRACTCE var that matches census shapefile var
+grid_covar_clean <- grid_covariates %>%
+  mutate(TRACTCE = substr(as.character(tract_key), 
+            nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) 
+
+# mobile covar
+glimpse(mobile_covariates)
+# create 6 digit TRACTCE var that matches census shapefile var
+mobile_covar_clean <- mobile_covariates %>%
+  mutate(TRACTCE = substr(as.character(tract_key), 
+            nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key))))
+```
+
+# Descriptive statistics
+
+## Descriptive statistics for stop data
+
+This is super basic at the moment.
+```{r desc.stats.stop.data}
+stop_clean %>% group_by(variable) %>% summarise(N=n(),
+                                                mean=mean(mean_value),
+                                                sd=sd(mean_value),
+                                                max=max(mean_value),
+                                                min(mean_value),
+                                                median=median(median_value))
+
+```
+
+## Descriptive statistics for annual data
+
+Also very basic at the moment.
+```{r desc.stats.annual.data}
+annual_clean %>% group_by(variable) %>% summarise(N=n(),
+                                                mean=mean(mean_value),
+                                                sd=sd(mean_value),
+                                                max=max(mean_value),
+                                                min(mean_value),
+                                                median=median(median_value))
 ```
