@@ -65,6 +65,7 @@ grid_covariates <- read_csv("dr0311_grid_covariates.csv")
 mobile_covariates <- read_csv("dr0311_mobile_covariates.csv")
 
 stop_data <- read_csv("stop_data.csv")
+
 ```
 
 # Clean data
