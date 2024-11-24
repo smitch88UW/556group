@@ -66,6 +66,13 @@ mobile_covariates <- read_csv("dr0311_mobile_covariates.csv")
 
 stop_data <- read_csv("stop_data.csv")
 
+acs_race <- read_csv("ACS19_race.csv")
+
+acs_ethnicity <- read_csv("ACS19_ethnicity.csv")
+
+acs_language <- read_csv("ACS19_language.csv")
+
+acs_median_income <- read_csv("ACS19_median_income.csv")
 ```
 
 # Clean data
@@ -113,6 +120,34 @@ glimpse(mobile_covariates)
 mobile_covar_clean <- mobile_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key))))
+
+# acs race data
+glimpse(acs_race)
+# create 6 digit TRACTCE var that matches census shapefile var
+acs_race_clean <- acs_race %>%
+  mutate(TRACTCE = substr(as.character(GEO_ID), 
+            nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
+
+# acs ethnicity data
+glimpse(acs_ethnicity)
+# create 6 digit TRACTCE var that matches census shapefile var
+acs_ethnicity_clean <- acs_ethnicity %>%
+  mutate(TRACTCE = substr(as.character(GEO_ID), 
+            nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
+
+# acs language data
+glimpse(acs_language)
+# create 6 digit TRACTCE var that matches census shapefile var
+acs_language_clean <- acs_language %>%
+  mutate(TRACTCE = substr(as.character(GEO_ID), 
+            nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
+
+# acs median income data
+glimpse(acs_median_income)
+# create 6 digit TRACTCE var that matches census shapefile var
+acs_median_income_clean <- acs_median_income %>%
+  mutate(TRACTCE = substr(as.character(GEO_ID), 
+            nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
 ```
 
 # Descriptive statistics
@@ -134,10 +169,11 @@ stop_clean %>% group_by(variable) %>% summarise(N=n(),
 
 Also very basic at the moment.
 ```{r desc.stats.annual.data}
+# edited this code to reflect the correct numeric variable ("value") in the dataset, which only has annual predictions for no2, so I don't think we'll want to summarize this data -kt
 annual_clean %>% group_by(variable) %>% summarise(N=n(),
-                                                mean=mean(mean_value),
-                                                sd=sd(mean_value),
-                                                max=max(mean_value),
-                                                min(mean_value),
-                                                median=median(median_value))
+                                                mean=mean(value),
+                                                sd=sd(value),
+                                                max=max(value),
+                                                min(value),
+                                                median=median(value))
 ```
