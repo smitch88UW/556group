@@ -79,7 +79,7 @@ acs_median_income <- read_csv("ACS19_median_income.csv")
 
 We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data and the annual data. We obtained Census shapefile data from the Census Bureau's website for Washington, and only kept those within King, Snohomish, Pierce, and Kitsap counties (*might not need Kitsap but I didn't want to open the map to check*). We linked data using the 6-digit tract code.
 
-Still TO-DO: are we selecting only covariates from Mercer et al? There are currently 887 covariates, we definitely need to pare down, just not sure if we want to add any others.
+Still TO-DO: are we selecting only covariates from Mercer et al? There are currently 887 covariates, we definitely need to pare down, just not sure if we want to add any others. #Jorge & Stephanie vote to select the 7 covariates from hw?
 
 ```{r data.cleaning}
 # stop data
@@ -91,7 +91,7 @@ stop_clean <- stop_data %>%
 table(stop_clean$runname)
 
 # annual data
-glimpse(annual_data)
+#glimpse(annual_data)
 table(annual_data$variable)
 # keep only NO2 and PM, get rid of annual variable since they are all mean_of_win_medians
 annual_clean <- annual_data %>% 
@@ -99,7 +99,7 @@ annual_clean <- annual_data %>%
   select(-c(annual))
 
 # census data
-glimpse(census_shapefile)
+#glimpse(census_shapefile)
 table(census_shapefile$COUNTYFP) # there are 39 counties, we don't need them all 
 # only keep King (033), Snohomish (061), Pierce (053), Kitsap (035)
 # get rid of LSAD and STATEFP since they are all the same
@@ -108,49 +108,201 @@ census_clean <- census_shapefile %>%
   select(-c(LSAD,STATEFP))
 
 # grid covar
-glimpse(grid_covariates)
+#glimpse(grid_covariates)
 # create 6 digit TRACTCE var that matches census shapefile var
 grid_covar_clean <- grid_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) 
 
 # mobile covar
-glimpse(mobile_covariates)
+#glimpse(mobile_covariates)
 # create 6 digit TRACTCE var that matches census shapefile var
 mobile_covar_clean <- mobile_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key))))
 
 # acs race data
-glimpse(acs_race)
+#glimpse(acs_race)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_race_clean <- acs_race %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-
+colnames(acs_race_clean)
 # acs ethnicity data
-glimpse(acs_ethnicity)
+#glimpse(acs_ethnicity)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_ethnicity_clean <- acs_ethnicity %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-
+colnames(acs_ethnicity_clean)
 # acs language data
-glimpse(acs_language)
+#glimpse(acs_language)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_language_clean <- acs_language %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-
+colnames(acs_language_clean)
 # acs median income data
-glimpse(acs_median_income)
+#glimpse(acs_median_income)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_median_income_clean <- acs_median_income %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
 ```
+#ACS data merge: The goal with this merge is to create 1 CSV for us to work with all relevant ACS data for our project 
+```{r}
 
+#------------------------------------------------steph cleaning: How can we determine if a census tract is above or below FPL using this data?
+
+#Load data frames: acs_language_clean, acs_median_income_clean, acs_race_clean
+
+# Find common column names across all three datasets
+common_columns <- Reduce(intersect, list(colnames(acs_language_clean), 
+                                         colnames(acs_median_income_clean), 
+                                         colnames(acs_race_clean)))
+
+
+# Print the common columns
+print(common_columns)
+
+colnames(acs_language_clean)
+colnames(acs_race_clean)
+colnames(acs_ethnicity_clean)
+
+#merge and clean language, race, ethnicity datasets
+acs_combined <- reduce(
+  list(acs_language_clean, acs_race_clean, acs_ethnicity_clean),
+  function(x, y) merge(x, y, by = c("GEO_ID", "NAME", "TRACTCE"), all = TRUE)
+)
+colnames(acs_combined)
+
+#NOTE: Variables dropped from this merge: dropped 2ormore column due to complications with code running and to simplify demographics, dropped non-hispanic or latino since it was redundant and we have a "yes" column for hispanic or latino; also removed total_pop_5yearsplus since it is a variable for children over age 5 and did not seem relevant to our questions
+acs_simplified <- acs_combined %>%
+  select(GEO_ID, NAME, TRACTCE, English_only, Language_other_than_English, Spanish, Indo_European, Asian_PI, Other, White, Black_AfricanAmerican, AIAN, Asian, Hawaiian_PacificIslander, Other_alone, HispanicorLatino)
+colnames(acs_simplified)
+#-----------------------# Data Dictionary for ACS Combined Dataset # 
+# GEO_ID : Unique identifier for the geographic area (e.g., census tract, block group) # NAME : Name of the geographic area (e.g., "Census Tract 1, County, State") # TRACTCE : Census tract code, uniquely identifying the geographic unit within a county # # Household Demographics: # White_Households : Number of households with a White population # Black_Households : Number of households with a Black or African American population # AIAN_Households : Number of households with an American Indian or Alaska Native (AIAN) population # Asian_Households : Number of households with an Asian population # Hawaiian_PI_Households : Number of households with a Native Hawaiian or Pacific Islander (Hawaiian_PI) population # Other_alone_Households : Number of households with people from other racial/ethnic groups (alone) # HispanicorLatino_Households : Number of households with a Hispanic or Latino population #
+#----------------------
+#merge acs_median_income_clean with acs_simplified
+colnames(acs_median_income_clean)
+acs_combined <- acs_simplified %>%
+  left_join(acs_median_income_clean %>%
+              select(GEO_ID, NAME, TRACTCE, 
+                     White_Households, Black_Households, AIAN_Households,
+                     Asian_Households, Hawaiian_PI_Households,
+                     Other_alone_Households, HispanicorLatino_Households,
+                     Total_Households_Income, Total_Households_Income_ME,
+                     White_Households_Income, White_Households_Income_ME,
+                     Black_Households_Income, Black_Households_Income_ME,
+                     Asian_Households_Income, Asian_Households_Income_ME,
+                     HispanicorLatino_Households_Income, HispanicorLatino_Households_Income_ME), 
+            by = c("GEO_ID", "NAME", "TRACTCE"))
+colnames(acs_combined)
+```
 # Descriptive statistics
+
+## Descriptive stats for census data
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# Summarize demographics
+demographics <- acs_combined %>%
+  select(White, Black_AfricanAmerican, AIAN, Asian, Hawaiian_PacificIslander, HispanicorLatino, Other_alone) %>%
+  summarise_all(sum, na.rm = TRUE) %>%
+  pivot_longer(cols = everything(), names_to = "Group", values_to = "Count") %>%
+  mutate(Percentage = Count / sum(Count) * 100)
+
+# Summarize income statistics
+income_stats <- acs_combined %>%
+  summarise(
+    Mean_Income = mean(Total_Households_Income, na.rm = TRUE),
+    Median_Income = median(Total_Households_Income, na.rm = TRUE),
+    SD_Income = sd(Total_Households_Income, na.rm = TRUE)
+  )
+
+income_by_group <- acs_combined %>%
+  summarise(
+    Mean_Income = mean(Total_Households_Income, na.rm = TRUE),
+    Median_Income = median(Total_Households_Income, na.rm = TRUE)
+  )
+
+# Summarize language usage
+language_usage <- acs_combined %>%
+  summarise(
+    English_only = sum(English_only, na.rm = TRUE),
+    Language_other_than_English = sum(Language_other_than_English, na.rm = TRUE),
+    Spanish = sum(Spanish, na.rm = TRUE),
+    Other = sum(Other, na.rm = TRUE)
+  ) %>%
+  pivot_longer(cols = everything(), names_to = "Language", values_to = "Count") %>%
+  mutate(Percentage = Count / sum(Count) * 100)
+
+# Income by language
+income_by_language <- acs_combined %>%
+  group_by(Language = case_when(
+    !is.na(English_only) ~ "English_only",
+    !is.na(Spanish) ~ "Spanish",
+    !is.na(Language_other_than_English) ~ "Other"
+  )) %>%
+  summarise(
+    Mean_Income = mean(Total_Households_Income, na.rm = TRUE),
+    Median_Income = median(Total_Households_Income, na.rm = TRUE)
+  )
+
+# # Summarize above/below FPL
+# fpl_summary <- acs_combined %>%
+#   group_by(Above_FPL) %>%
+#   summarise(
+#     Count = n(),
+#     Percentage = Count / nrow(acs_data) * 100
+#   )
+# 
+# fpl_by_group <- acs_combined %>%
+#   group_by(Group = case_when(
+#     !is.na(White) ~ "White",
+#     !is.na(Black_AfricanAmerican) ~ "Black_AfricanAmerican",
+#     !is.na(HispanicorLatino) ~ "HispanicorLatino"
+#   ), Above_FPL) %>%
+#   summarise(Count = n(), .groups = "drop") %>%
+#   group_by(Group) %>%
+#   mutate(Percentage = Count / sum(Count) * 100)
+
+# Visualization: Demographics Bar Chart
+ggplot(demographics, aes(x = Group, y = Count, fill = Group)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Racial/Ethnic Composition of Households", x = "Group", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# # Visualization: Income Distribution Box Plot
+# #ggplot(acs_combined, aes(x = factor(Above_FPL), y = Total_Households_Income, fill = Above_FPL)) +
+#   # geom_boxplot() +
+#   theme_minimal() +
+#   labs(title = "Income Distribution Above/Below FPL", x = "Above/Below FPL", y = "Total Household Income")
+
+# Print tables for review
+print("Demographics Summary")
+print(demographics)
+
+print("Income Statistics")
+print(income_stats)
+
+print("Language Usage Summary")
+print(language_usage)
+
+print("Income by Language")
+print(income_by_language)
+
+#print("Above/Below FPL Summary")
+#print(fpl_summary)
+
+#print("Above/Below FPL by Group")
+#print(fpl_by_group)
+
+```
 
 ## Descriptive statistics for stop data
 
