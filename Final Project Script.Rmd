@@ -6,6 +6,8 @@ output: html_document:
   toc_collapsed: true
 toc_depth: 3
 date: "2024-11-21"
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Set-up and load data
@@ -79,7 +81,7 @@ acs_median_income <- read_csv("ACS19_median_income.csv")
 
 We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data and the annual data. We obtained Census shapefile data from the Census Bureau's website for Washington, and only kept those within King, Snohomish, Pierce, and Kitsap counties (*might not need Kitsap but I didn't want to open the map to check*). We linked data using the 6-digit tract code.
 
-Still TO-DO: are we selecting only covariates from Mercer et al? There are currently 887 covariates, we definitely need to pare down, just not sure if we want to add any others. #Jorge & Stephanie vote to select the 7 covariates from hw?
+Still TO-DO: are we selecting only covariates from Mercer et al? There are currently 887 covariates, we definitely need to pare down, just not sure if we want to add any others. #Jorge & Stephanie vote to select the 7 covariates from hw + airport?
 
 ```{r data.cleaning}
 # stop data
@@ -110,9 +112,23 @@ census_clean <- census_shapefile %>%
 # grid covar
 #glimpse(grid_covariates)
 # create 6 digit TRACTCE var that matches census shapefile var
+
+# find airport columns
 grid_covar_clean <- grid_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
-            nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) 
+            nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) #%>%
+  # select(c(location_id, native_id, tract_key, m_to_l_airp, m_to_a1,
+  #          m_to_bus, m_to_coast,m_to_comm, elev_1k_above, elev_5k_above,
+  #          elev_1k_at_elev, elev_5k_at_elev, elev_1k_below, elev_5k_below,
+  #          elev_elevation, elev_1k_stdev, elev_5k_stdev, imp_a00050,
+  #          imp_a00100, imp_a00150, imp_a00300, imp_a00400, imp_a00500,
+  #          imp_a00750, imp_a01000, imp_a03000, rlu_decid_forest_p00500,
+  #          rlu_decid_forest_p00750, rlu_decid_forest_p01000,
+  #          rlu_dev_hi_p00300, rlu_dev_hi_p00400, rlu_dev_hi_p00500,
+  #          rlu_dev_hi_p00750, rlu_dev_hi_p01000, rlu_dev_hi_p03000,
+  #          rlu_dev_hi_p05000, rlu_dev_lo_p00050, ))
+
+### commented above - some of the variables included in the mobile monitoring predictions, not all of them MISSING: no2_behr
 
 # mobile covar
 #glimpse(mobile_covariates)
@@ -147,7 +163,22 @@ colnames(acs_language_clean)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_median_income_clean <- acs_median_income %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
-            nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
+            nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))),
+         Total_Households_Income = as.numeric(Total_Households_Income),
+         Total_Households_Income_ME = as.numeric(Total_Households_Income_ME),
+         White_Households_Income = as.numeric(White_Households_Income),
+         White_Households_Income_ME = as.numeric(White_Households_Income_ME),
+         Black_Households_Income = as.numeric(Black_Households_Income),
+         Black_Households_Income_ME = as.numeric(Black_Households_Income_ME),
+         AIAN_Households_Income = as.numeric(AIAN_Households_Income),
+         AIAN_Households_Income_ME = as.numeric(AIAN_Households_Income_ME),
+         Asian_Households_Income = as.numeric(Asian_Households_Income_ME),
+         Hawaiian_PI_Households_Income = as.numeric(Hawaiian_PI_Households_Income_ME),
+         Other_alone_Households_Income = as.numeric(Other_alone_Households_Income),
+         Other_alone_Households_Income_ME = as.numeric(Other_alone_Households_Income_ME),
+         HispanicorLatino_Households_Income = as.numeric(HispanicorLatino_Households_Income),
+         HispanicorLatino_Households_Income_ME=as.numeric(HispanicorLatino_Households_Income_ME)
+         )
 ```
 #ACS data merge: The goal with this merge is to create 1 CSV for us to work with all relevant ACS data for our project 
 ```{r}
