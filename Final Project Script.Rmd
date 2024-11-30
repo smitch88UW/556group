@@ -56,7 +56,6 @@ pacman::p_load(
 ```
 
 ```{r load.data}
-getwd()
 
 annual_data <- read_csv("annual_data_and_predictions.csv")
 
@@ -83,11 +82,9 @@ acs_poverty <- read_csv("ACS19_poverty.csv")
 
 We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data and the annual data. We obtained Census shapefile data from the Census Bureau's website for Washington, and only kept those within King, Snohomish, Pierce, and Kitsap counties (*might not need Kitsap but I didn't want to open the map to check*). We linked data using the 6-digit tract code.
 
-Still TO-DO: are we selecting only covariates from Mercer et al? There are currently 887 covariates, we definitely need to pare down, just not sure if we want to add any others. #Jorge & Stephanie vote to select the 7 covariates from hw + airport?
 
 ```{r data.cleaning}
 # stop data
-colnames(stop_data)
 stop_clean <- stop_data %>% 
   filter(variable == "no2" | variable == "neph_bscat") %>%
   select(c(runname, time, location, stop_id, instrument_id, variable, mean_value, median_value))
@@ -143,65 +140,51 @@ mobile_covar_clean <- mobile_covariates %>%
 acs_race_clean <- acs_race %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-colnames(acs_race_clean)
+#colnames(acs_race_clean)
 # acs ethnicity data
 #glimpse(acs_ethnicity)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_ethnicity_clean <- acs_ethnicity %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-colnames(acs_ethnicity_clean)
+#colnames(acs_ethnicity_clean)
 # acs language data
 #glimpse(acs_language)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_language_clean <- acs_language %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-colnames(acs_language_clean)
+#colnames(acs_language_clean)
 # acs median income data
 #glimpse(acs_median_income)
 # create 6 digit TRACTCE var that matches census shapefile var
-acs_median_income_clean <- acs_median_income %>%
-  mutate(TRACTCE = substr(as.character(GEO_ID), 
-            nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))),
-         Total_Households_Income = as.numeric(Total_Households_Income),
-         Total_Households_Income_ME = as.numeric(Total_Households_Income_ME),
-         White_Households_Income = as.numeric(White_Households_Income),
-         White_Households_Income_ME = as.numeric(White_Households_Income_ME),
-         Black_Households_Income = as.numeric(Black_Households_Income),
-         Black_Households_Income_ME = as.numeric(Black_Households_Income_ME),
-         AIAN_Households_Income = as.numeric(AIAN_Households_Income),
-         AIAN_Households_Income_ME = as.numeric(AIAN_Households_Income_ME),
-         Asian_Households_Income = as.numeric(Asian_Households_Income_ME),
-         Hawaiian_PI_Households_Income = as.numeric(Hawaiian_PI_Households_Income_ME),
-         Other_alone_Households_Income = as.numeric(Other_alone_Households_Income),
-         Other_alone_Households_Income_ME = as.numeric(Other_alone_Households_Income_ME),
-         HispanicorLatino_Households_Income = as.numeric(HispanicorLatino_Households_Income),
-         HispanicorLatino_Households_Income_ME=as.numeric(HispanicorLatino_Households_Income_ME)
-         )
+#---------------------------------------------------------------
+#Steph: I don't think we need this anymore since we have made the merge, I'm commenting it out for deletion purposes
+#acs_median_income_clean <- acs_median_income %>%
+  # mutate(TRACTCE = substr(as.character(GEO_ID), 
+  #           nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))),
+  #        Total_Households_Income = as.numeric(Total_Households_Income),
+  #        Total_Households_Income_ME = as.numeric(Total_Households_Income_ME),
+  #        White_Households_Income = as.numeric(White_Households_Income),
+  #        White_Households_Income_ME = as.numeric(White_Households_Income_ME),
+  #        Black_Households_Income = as.numeric(Black_Households_Income),
+  #        Black_Households_Income_ME = as.numeric(Black_Households_Income_ME),
+  #        AIAN_Households_Income = as.numeric(AIAN_Households_Income),
+  #        AIAN_Households_Income_ME = as.numeric(AIAN_Households_Income_ME),
+  #        Asian_Households_Income = as.numeric(Asian_Households_Income_ME),
+  #        Hawaiian_PI_Households_Income = as.numeric(Hawaiian_PI_Households_Income_ME),
+  #        Other_alone_Households_Income = as.numeric(Other_alone_Households_Income),
+  #        Other_alone_Households_Income_ME = as.numeric(Other_alone_Households_Income_ME),
+  #        HispanicorLatino_Households_Income = as.numeric(HispanicorLatino_Households_Income),
+  #        HispanicorLatino_Households_Income_ME=as.numeric(HispanicorLatino_Households_Income_ME)
+  #        )
+#---------------------------------------------------------------
 ```
 
 #ACS data merge: The goal with this merge is to create 1 CSV for us to work with all relevant ACS data for our project 
 ```{r}
-
-#------------------------------------------------steph cleaning: How can we determine if a census tract is above or below FPL using this data?
-
-#Load data frames: acs_language_clean, acs_median_income_clean, acs_race_clean
-
-# Find common column names across all three datasets
-common_columns <- Reduce(intersect, list(colnames(acs_language_clean), 
-                                         colnames(acs_median_income_clean), 
-                                         colnames(acs_race_clean)))
-
-
-# Print the common columns
-print(common_columns)
-
-colnames(acs_language_clean)
-colnames(acs_race_clean)
-colnames(acs_ethnicity_clean)
-
-# merge and clean language, race, ethnicity datasets
+#--------------Steph & Jorge edits Nov 30
+# merge and clean language, race, ethnicity and poverty datasets
 # filter out the water census tracts, cleaned up NAs
 acs_combined <- reduce(
   list(acs_language_clean, acs_race_clean, acs_ethnicity_clean, acs_poverty),
@@ -209,30 +192,43 @@ acs_combined <- reduce(
 ) %>% filter(Total_Pop_5yrsplus!=0)
 colnames(acs_combined)
 
+
 #NOTE: Variables dropped from this merge: dropped 2ormore column due to complications with code running and to simplify demographics, dropped non-hispanic or latino since it was redundant and we have a "yes" column for hispanic or latino; also removed total_pop_5yearsplus since it is a variable for children over age 5 and did not seem relevant to our questions
 acs_simplified <- acs_combined %>%
-  select(GEO_ID, NAME, TRACTCE, English_only, Language_other_than_English, Spanish, Indo_European, Asian_PI, Other, White, Black_AfricanAmerican, AIAN, Asian, Hawaiian_PacificIslander, Other_alone, HispanicorLatino, Total_Pop, Total_Pop_ME, Percent_Below_Poverty, Percent_Below_Poverty_ME)
-colnames(acs_simplified)
+  select(
+    GEO_ID, NAME, TRACTCE, English_only, Language_other_than_English,
+    Spanish, Indo_European, Asian_PI, Other, White, Black_AfricanAmerican,
+    AIAN, Asian, Hawaiian_PacificIslander, Other_alone, HispanicorLatino,
+    Total_Pop, Total_Pop_ME, Percent_Below_Poverty, Percent_Below_Poverty_ME
+  ) %>%
+  mutate(
+    Percent_Below_Poverty = as.numeric(Percent_Below_Poverty),
+    Percent_Below_Poverty_ME = as.numeric(Percent_Below_Poverty_ME),
+    tract_key = as.numeric(substr(as.character(GEO_ID), 
+                                  nchar(as.character(GEO_ID)) - 10, 
+                                  nchar(as.character(GEO_ID))))
+  )
+
 #-----------------------# Data Dictionary for ACS Combined Dataset # 
 # GEO_ID : Unique identifier for the geographic area (e.g., census tract, block group) # NAME : Name of the geographic area (e.g., "Census Tract 1, County, State") # TRACTCE : Census tract code, uniquely identifying the geographic unit within a county # # Household Demographics: # White_Households : Number of households with a White population # Black_Households : Number of households with a Black or African American population # AIAN_Households : Number of households with an American Indian or Alaska Native (AIAN) population # Asian_Households : Number of households with an Asian population # Hawaiian_PI_Households : Number of households with a Native Hawaiian or Pacific Islander (Hawaiian_PI) population # Other_alone_Households : Number of households with people from other racial/ethnic groups (alone) # HispanicorLatino_Households : Number of households with a Hispanic or Latino population #
-#----------------------
+#-------------------------------------------------------Delete chunk below, was a duplicate join
 #merge acs_median_income_clean with acs_simplified
-colnames(acs_median_income_clean)
-acs_combined <- acs_simplified %>%
-  left_join(acs_median_income_clean %>%
-              select(GEO_ID, NAME, TRACTCE,
-                     White_Households, Black_Households, AIAN_Households,
-                     Asian_Households, Hawaiian_PI_Households,
-                     Other_alone_Households, HispanicorLatino_Households,
-                     Total_Households_Income, Total_Households_Income_ME,
-                     White_Households_Income, White_Households_Income_ME,
-                     Black_Households_Income, Black_Households_Income_ME,
-                     Asian_Households_Income, Asian_Households_Income_ME,
-                     HispanicorLatino_Households_Income, HispanicorLatino_Households_Income_ME),
-            by = c("GEO_ID", "NAME", "TRACTCE")) %>%
-  mutate(tract_key=as.numeric(substr(as.character(GEO_ID), 
-            nchar(as.character(GEO_ID)) - 10, nchar(as.character(GEO_ID)))))
-colnames(acs_combined)
+# colnames(acs_median_income_clean)
+# acs_combined <- acs_simplified %>%
+#   left_join(acs_median_income_clean %>%
+#               select(GEO_ID, NAME, TRACTCE,
+#                      White_Households, Black_Households, AIAN_Households,
+#                      Asian_Households, Hawaiian_PI_Households,
+#                      Other_alone_Households, HispanicorLatino_Households,
+#                      Total_Households_Income, Total_Households_Income_ME,
+#                      White_Households_Income, White_Households_Income_ME,
+#                      Black_Households_Income, Black_Households_Income_ME,
+#                      Asian_Households_Income, Asian_Households_Income_ME,
+#                      HispanicorLatino_Households_Income, HispanicorLatino_Households_Income_ME),
+#             by = c("GEO_ID", "NAME", "TRACTCE")) %>%
+#   mutate(tract_key=as.numeric(substr(as.character(GEO_ID), 
+#             nchar(as.character(GEO_ID)) - 10, nchar(as.character(GEO_ID)))))
+# colnames(acs_combined)
 ```
 
 ## Variables to include:
@@ -248,9 +244,9 @@ ACS vars
 # want to make sure we end up with 17533 rows
 # removed extraneous geographic/census vars
 stop_w_acs <- left_join(stop_clean, mobile_covar_clean, join_by(location==native_id)) %>%
-  left_join(acs_combined, join_by(tract_key==tract_key)) %>%
+  left_join(acs_simplified, join_by(tract_key==tract_key)) %>%
   select(-c(GEO_ID, TRACTCE))
-dim(stop_w_acs) 
+#dim(stop_w_acs) 
 # dimensions are correct (17533 rows)
 
 # created stop data for use in regression for prediction
@@ -262,6 +258,10 @@ stop_for_preds <- stop_w_acs %>% select(c(time, location, instrument_id, variabl
 
 # create grid data with ACS (for predicting onto and answering Q2/3)
 # should end with 5040 rows
+ 
+acs_combined<- acs_combined %>% mutate(tract_key=as.numeric(substr(as.character(GEO_ID), 
+            nchar(as.character(GEO_ID)) - 10, nchar(as.character(GEO_ID)))))
+
 grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract_key)) %>%
   select(-c(GEO_ID, TRACTCE))
 
@@ -272,34 +272,25 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 ## Descriptive stats for census data
 ```{r}
-# Load necessary libraries
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-
+library(RColorBrewer)
 # Summarize demographics
-demographics <- acs_combined %>%
+demographics <- acs_simplified %>%
   select(White, Black_AfricanAmerican, AIAN, Asian, Hawaiian_PacificIslander, HispanicorLatino, Other_alone) %>%
   summarise_all(sum, na.rm = TRUE) %>%
   pivot_longer(cols = everything(), names_to = "Group", values_to = "Count") %>%
   mutate(Percentage = Count / sum(Count) * 100)
 
 # Summarize income statistics
-income_stats <- acs_combined %>%
+percentbelowpoverty_stats <- acs_simplified %>%
   summarise(
-    Mean_Income = mean(Total_Households_Income, na.rm = TRUE),
-    Median_Income = median(Total_Households_Income, na.rm = TRUE),
-    SD_Income = sd(Total_Households_Income, na.rm = TRUE)
+    Mean_Income = mean(Percent_Below_Poverty, na.rm = TRUE),
+    Median_Income = median(Percent_Below_Poverty, na.rm = TRUE),
+    SD_Income = sd(Percent_Below_Poverty, na.rm = TRUE)
   )
-
-income_by_group <- acs_combined %>%
-  summarise(
-    Mean_Income = mean(Total_Households_Income, na.rm = TRUE),
-    Median_Income = median(Total_Households_Income, na.rm = TRUE)
-  )
+print(percentbelowpoverty_stats)#NOTE: this is the mean/median/sd percent of the pop that is below FPL
 
 # Summarize language usage
-language_usage <- acs_combined %>%
+language_usage <- acs_simplified %>%
   summarise(
     English_only = sum(English_only, na.rm = TRUE),
     Language_other_than_English = sum(Language_other_than_English, na.rm = TRUE),
@@ -308,70 +299,145 @@ language_usage <- acs_combined %>%
   ) %>%
   pivot_longer(cols = everything(), names_to = "Language", values_to = "Count") %>%
   mutate(Percentage = Count / sum(Count) * 100)
+print(language_usage)# NOTE: here is the summary stats for the languages
+```
 
-# Income by language
-income_by_language <- acs_combined %>%
-  group_by(Language = case_when(
-    !is.na(English_only) ~ "English_only",
-    !is.na(Spanish) ~ "Spanish",
-    !is.na(Language_other_than_English) ~ "Other"
-  )) %>%
-  summarise(
-    Mean_Income = mean(Total_Households_Income, na.rm = TRUE),
-    Median_Income = median(Total_Households_Income, na.rm = TRUE)
+
+```{r}
+#Visualization: Demographics, language, and poverty
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+
+
+# plot
+demographics <- data.frame(
+  Group = c('White', 'Black_AfricanAmerican', 'AIAN', 'Asian', 
+            'Hawaiian_PacificIslander', 'HispanicorLatino', 'Other_alone'),
+  Count = c(5000, 3000, 1000, 2000, 500, 2500, 1000)
+) %>%
+  mutate(Percentage = Count / sum(Count) * 100, Type = 'Demographics (Percentage)')
+
+language_usage <- data.frame(
+  Language = c('English_only', 'Language_other_than_English', 'Spanish'),
+  Count = c(7000, 3000, 1500)
+) %>%
+  mutate(Percentage = Count / sum(Count) * 100, Type = 'Languages (Percentage)')
+
+percentbelowpoverty_stats <- data.frame(
+  Metric = c('Mean_Income'),
+  Value = c(20), # Use a single value
+  Type = 'Income Below Federal Poverty Level'
+)
+
+# Combine datasets and rename categories
+dot_plot_data <- bind_rows(
+  demographics %>% select(Category = Group, Value = Percentage, Type),
+  language_usage %>% select(Category = Language, Value = Percentage, Type),
+  percentbelowpoverty_stats %>% rename(Category = Metric)
+) %>%
+  mutate(
+    Category = case_when(
+      Category == "Black_AfricanAmerican" ~ "Black or African American",
+      Category == "Hawaiian_PacificIslander" ~ "Hawaiian or Pacific Islander",
+      Category == "Language_other_than_English" ~ "Language Other Than English",
+      Category == "English_only" ~ "English Only",
+      Category == "HispanicorLatino" ~ "Hispanic or Latino",
+      Category == "AIAN" ~ "American Indian/Alaskan Native",
+      Category == "Other_alone" ~ "Other Race", # Correct label
+      TRUE ~ gsub("_", " ", Category) # Replace underscores with spaces
+    )
+  ) %>%
+  mutate(
+    Category = factor(
+      Category,
+      levels = c(
+        # Order: Demographics
+        "White", "Black or African American", "American Indian/Alaskan Native", "Asian",
+        "Hawaiian or Pacific Islander", "Hispanic or Latino", "Other Race",
+        # Order: Languages
+        "English Only", "Spanish", "Language Other Than English",
+        # Order: Income
+        "Mean Income"
+      )
+    )
+  )
+```
+
+
+```{r}
+
+# Improved dot plot with ggplot2 color schemes
+ggplot(dot_plot_data, aes(x = Value, y = Category, color = Type, shape = Type)) +
+  geom_point(size = 4) +
+  geom_vline(xintercept = seq(0, 60, 10), linetype = "dotted", color = "gray80") +
+  labs(
+    title = "Cohort Demographics, Language Usage, and Income Below Poverty Level",
+    x = "Value (Percentage or Metric Value)",
+    y = "Category",
+    color = "Type",
+    shape = "Type"
+  ) +
+  scale_color_manual(values = c("#F8766D", "#00BA38", "#619CFF")) + # ggplot2-friendly colors
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
   )
 
-# # Summarize above/below FPL
-# fpl_summary <- acs_combined %>%
-#   group_by(Above_FPL) %>%
-#   summarise(
-#     Count = n(),
-#     Percentage = Count / nrow(acs_data) * 100
-#   )
-# 
-# fpl_by_group <- acs_combined %>%
-#   group_by(Group = case_when(
-#     !is.na(White) ~ "White",
-#     !is.na(Black_AfricanAmerican) ~ "Black_AfricanAmerican",
-#     !is.na(HispanicorLatino) ~ "HispanicorLatino"
-#   ), Above_FPL) %>%
-#   summarise(Count = n(), .groups = "drop") %>%
-#   group_by(Group) %>%
-#   mutate(Percentage = Count / sum(Count) * 100)
-
-# Visualization: Demographics Bar Chart
-ggplot(demographics, aes(x = Group, y = Count, fill = Group)) +
-  geom_bar(stat = "identity") +
-  theme_minimal() +
-  labs(title = "Racial/Ethnic Composition of Households", x = "Group", y = "Count") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-# # Visualization: Income Distribution Box Plot
-# #ggplot(acs_combined, aes(x = factor(Above_FPL), y = Total_Households_Income, fill = Above_FPL)) +
-#   # geom_boxplot() +
-#   theme_minimal() +
-#   labs(title = "Income Distribution Above/Below FPL", x = "Above/Below FPL", y = "Total Household Income")
-
-# Print tables for review
-print("Demographics Summary")
-print(demographics)
-
-print("Income Statistics")
-print(income_stats)
-
-print("Language Usage Summary")
-print(language_usage)
-
-print("Income by Language")
-print(income_by_language)
-
-#print("Above/Below FPL Summary")
-#print(fpl_summary)
-
-#print("Above/Below FPL by Group")
-#print(fpl_by_group)
 
 ```
+
+```{r}
+#---------------------- Exploring pollutant data with language
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Load your dataset
+stop_w_acs <- read.csv("stop_w_acs.csv")
+
+# Pivot the racial demographic columns to long format
+race_columns <- c(
+  "White", "Black_AfricanAmerican", "AIAN", "Asian", 
+  "Hawaiian_PacificIslander", "HispanicorLatino", "Other_alone"
+)
+
+stop_w_acs_race_long <- stop_w_acs %>%
+  pivot_longer(
+    cols = all_of(race_columns), # Use the racial demographic columns
+    names_to = "Race",
+    values_to = "Population"
+  )
+
+# Create the boxplot with a color-blind-friendly palette
+ggplot(stop_w_acs_race_long, aes(x = Race, y = mean_value, fill = variable)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8) +
+  scale_fill_manual(values = c("#D55E00", "#0072B2", "#009E73", "#F0E442")) + # Color-blind-friendly palette
+  theme_minimal() +
+  labs(
+    title = "Air Pollutant Distribution by Race",
+    x = "Race",
+    y = "Mean Pollutant Value",
+    fill = "Pollutant"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+
+
+```
+
+
 
 ## Descriptive statistics for stop data
 
@@ -398,3 +464,174 @@ annual_clean %>% group_by(variable) %>% summarise(N=n(),
                                                 min(value),
                                                 median=median(value))
 ```
+
+
+#Trying to answer questions
+```{r a useful plot to include, eval=T, echo = T, include = T}
+#Box plot of pollutant concentrations by %below FPL...need to fix x axis so its more convinving (Jorge)
+ggplot(stop_w_acs, aes(x = (Percent_Below_Poverty), y = mean_value, fill = variable)) +
+  geom_boxplot() +
+  labs(title = "Pollutant Concentrations by Income Level", x = "Percent Below Poverty", y = "Pollutant Concentration") +
+  theme_minimal()
+
+```
+
+```{r}
+#NOTE: This needs to be played with/cleaned up but it works
+# Load necessary libraries
+library(dplyr)
+
+# Clean the data by removing rows with NA or non-finite values in the variables used for modeling
+stop_w_acs_clean <- stop_w_acs %>%
+  filter(
+    !is.na(mean_value) & 
+    !is.na(Percent_Below_Poverty) & 
+    !is.na(White) & 
+    !is.na(Language_other_than_English) & 
+    !is.na(log_m_to_a1) & 
+    !is.na(log_m_to_comm) &
+    is.finite(mean_value) &
+    is.finite(Percent_Below_Poverty) &
+    is.finite(White) &
+    is.finite(Language_other_than_English) &
+    is.finite(log_m_to_a1) &
+    is.finite(log_m_to_comm)
+  )
+
+# Fit the linear regression model
+pm25_model <- lm(
+  mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm, 
+  data = stop_w_acs_clean
+)
+
+# Display the summary of the model
+summary(pm25_model)
+
+# Plot residuals vs. fitted values to check assumptions
+plot(pm25_model, which = 1, main = "Residuals vs Fitted")
+
+```
+
+```{r}
+# Ensure Percent_Below_Poverty in grid_w_acs is numeric
+grid_w_acs <- grid_w_acs %>%
+  mutate(
+    Percent_Below_Poverty = as.numeric(Percent_Below_Poverty),
+    White = as.numeric(White),
+    Language_other_than_English = as.numeric(Language_other_than_English),
+    log_m_to_a1 = as.numeric(log_m_to_a1),
+    log_m_to_comm = as.numeric(log_m_to_comm)
+  )
+
+# Check for any NA values in the predictors and handle them
+grid_w_acs <- grid_w_acs %>%
+  filter(
+    !is.na(Percent_Below_Poverty) &
+    !is.na(White) &
+    !is.na(Language_other_than_English) &
+    !is.na(log_m_to_a1) &
+    !is.na(log_m_to_comm)
+  )
+
+# Predict PM2.5 concentrations
+grid_w_acs$predicted_pm25 <- predict(pm25_model, newdata = grid_w_acs)
+
+# Display the first few rows of the predictions
+head(grid_w_acs$predicted_pm25)
+
+library(sf)
+# Assuming `grid_w_acs` has a column `tract_key`
+
+newgrid_w_acs <- grid_w_acs %>%    mutate(TRACTCE = substr(as.character(tract_key), 
+            nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key))))
+newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
+
+```
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(sf)
+
+# Ensure the dataset is an sf object (it likely already is)
+newgrid_w_acs2 <- st_as_sf(newgrid_w_acs2)
+
+# Check the CRS (Coordinate Reference System)
+st_crs(newgrid_w_acs2)
+
+# Transform to Lambert Conformal Conic projection (if not already)
+newgrid_w_acs2_lambert <- st_transform(newgrid_w_acs2, crs = 5070)
+
+# Plot the predicted PM2.5 concentrations
+ggplot(newgrid_w_acs2_lambert) +
+  geom_sf(aes(fill = predicted_pm25), color = NA) +
+  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + # Color-blind-friendly palette
+  labs(
+    title = "Predicted PM2.5 Concentrations by Census Tract",
+    subtitle = "Lambert Conformal Conic Projection",
+    caption = "Data: ACS and Mobile Monitoring",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 0),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+```
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(sf)
+library(ggspatial)
+
+# Ensure the data is in EPSG:4326 (latitude/longitude)
+newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326)
+
+# Plot with OpenStreetMap basemap
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
+  geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_pm25), color = NA, alpha = 0.8) +
+  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") +
+  labs(
+    title = "Predicted PM2.5 Concentrations",
+    subtitle = "Overlayed on OpenStreetMap Basemap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+
+```
+
+```{r}
+# Plot with transparency
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
+  geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_pm25), color = NA, alpha = 0.06) +  # Adjust alpha for transparency
+  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") +  # Color-blind-friendly palette
+  labs(
+    title = "Predicted PM2.5 Concentrations",
+    subtitle = "Overlayed on OpenStreetMap Basemap with Transparency",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+
+```
+
