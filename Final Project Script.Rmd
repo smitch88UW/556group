@@ -96,8 +96,9 @@ table(stop_clean$runname)
 table(annual_data$variable)
 # keep only NO2 and PM, get rid of annual variable since they are all mean_of_win_medians
 annual_clean <- annual_data %>% 
-  filter(variable == "no2" | variable == "neph_bscat") %>%
+  filter(variable == "no2" | variable == "pm2.5_ug_m3") %>%
   select(-c(annual))
+
 
 # census data
 #glimpse(census_shapefile)
@@ -498,14 +499,29 @@ stop_w_acs_clean <- stop_w_acs %>%
     is.finite(log_m_to_comm)
   )
 
+pm25_stop_acs_clean <- stop_w_acs_clean %>% filter(variable == "neph_bscat")
+
+no2_stop_acs_clean <- stop_w_acs_clean %>% filter(variable == "no2")
+
+pm25_annual_data <- annual
+
+View(pm25_stop_acs_clean)
+View(no2_stop_acs_clean)
+
 # Fit the linear regression model
 pm25_model <- lm(
-  mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm, 
-  data = stop_w_acs_clean
+  mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp, 
+  data = pm25_stop_acs_clean
+)
+
+no2_model <- lm(
+  mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp,
+  data = no2_stop_acs_clean
 )
 
 # Display the summary of the model
 summary(pm25_model)
+summary(no2_model)
 
 # Plot residuals vs. fitted values to check assumptions
 plot(pm25_model, which = 1, main = "Residuals vs Fitted")
@@ -633,5 +649,34 @@ ggplot() +
     legend.text = element_text(size = 10)
   )
 
+```
+
+```{r}
+library(tigris) # To get shapefiles for King County, WA
+library(sf) 
+library(ggspatial)
+
+# Load King County, WA shapefile 
+king_county <- counties(state = "WA", cb = TRUE) %>% filter(NAME == "King") 
+
+king_county <- st_transform(king_county, crs = 4326)
+
+# Ensure the data is in EPSG:4326 (latitude/longitude) 
+newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326) 
+
+# Clip the predicted PM2.5 data to the boundary of King County 
+newgrid_king_county <- st_intersection(newgrid_w_acs2_latlong, king_county) 
+
+# Plot with OpenStreetMap basemap, focusing on King County, WA 
+
+ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
+  geom_sf(data = newgrid_king_county, aes(fill = predicted_pm25), color = NA, alpha = 0.8) + scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA",
+ subtitle = "Overlayed on OpenStreetMap Basemap", x = "Longitude", y = "Latitude" ) + theme_minimal() + theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) ) 
+
+# Plot with transparency for better clarity 
+ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
+  geom_sf(data = newgrid_king_county, aes(fill = predicted_pm25), color = NA, alpha = 0.06) + # Adjust alpha for transparency 
+  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + # Color-blind-friendly palette 
+  labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA", subtitle = "Overlayed on OpenStreetMap Basemap with Transparency", x = "Longitude", y = "Latitude" ) + theme_minimal() +               theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) )                                                                                                                                                     
 ```
 
