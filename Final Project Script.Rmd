@@ -85,19 +85,44 @@ We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data a
 
 ```{r data.cleaning}
 # stop data
+#create variable to differentiate between stop site and collocation site
+stop_data <- stop_data %>% 
+  mutate(SiteType = ifelse(grepl("MS", location), "stop site",
+                       ifelse(grepl("MC", location), "collocation site", NA)))
+
 stop_clean <- stop_data %>% 
   filter(variable == "no2" | variable == "neph_bscat") %>%
-  select(c(runname, time, location, stop_id, instrument_id, variable, mean_value, median_value))
+  filter(SiteType == "stop site") %>% 
+  select(c(runname, time, location, stop_id, instrument_id, variable, mean_value, median_value))   
 
-table(stop_clean$runname)
+stop_clean <- stop_clean %>% 
+  filter(median_value > 0) %>% # what are our thoughts on this?
+  mutate(log_median = log(median_value)) %>% 
+  filter(log_median > 0) # and on this?
+
+# Generate NO2 specific dataset
+no2_stop_clean <- stop_clean %>%
+  filter(variable == "no2")
+
+# Generate PM2.5 specific dataset
+pm25_stop_clean <- stop_clean %>% 
+  filter(variable == "neph_bscat")
+
 
 # annual data
 #glimpse(annual_data)
 table(annual_data$variable)
+
+#create variable to differentiate between stop site and collocation site
+annual_data <- annual_data %>% 
+  mutate(SiteType = ifelse(grepl("MS", location), "stop site",
+                       ifelse(grepl("MC", location), "collocation site", NA)))
+
 # keep only NO2 and PM, get rid of annual variable since they are all mean_of_win_medians
 annual_clean <- annual_data %>% 
   filter(variable == "no2" | variable == "pm2.5_ug_m3") %>%
-  select(-c(annual))
+  filter(SiteType == "stop site") %>% 
+  select(-c(annual, SiteType))
 
 
 # census data
@@ -107,7 +132,8 @@ table(census_shapefile$COUNTYFP) # there are 39 counties, we don't need them all
 # get rid of LSAD and STATEFP since they are all the same
 census_clean <- census_shapefile %>%
   filter(COUNTYFP %in% c("033", "061", "053", "035")) %>%
-  select(-c(LSAD,STATEFP))
+  select(-c(LSAD,STATEFP)) %>% 
+  st_as_sf()
 
 # grid covar
 #glimpse(grid_covariates)
@@ -129,11 +155,22 @@ grid_covar_clean <- grid_covariates %>%
 mobile_covar_clean <- mobile_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) %>%
-  select(c(location_id, native_id, tract_key, m_to_a1, m_to_a2, m_to_a3, pop10_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000)) %>%
+  select(c(location_id, native_id, tract_key, TRACTCE, m_to_a1, m_to_a2, m_to_a3, pop10_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000)) %>%
   mutate(log_m_to_a1 = log(m_to_a1), log_m_to_a2=log(m_to_a2), log_m_to_a3=log(m_to_a3),
          log_m_to_coast=log(m_to_coast), log_m_to_l_airp=log(m_to_l_airp), 
          log_m_to_comm=log(m_to_comm)) %>% 
   select(-c(m_to_a1,m_to_a2,m_to_a3,m_to_coast,m_to_l_airp,m_to_comm))
+
+# create dataset with stop and mobile data combined
+stop_and_mobile <- merge(stop_clean, mobile_covar_clean,
+                       by.x = "location", by.y = "native_id", 
+                       all = FALSE)
+
+# Join with census_clean
+stop_mobile_census <- census_clean %>%
+  inner_join(stop_and_mobile, by = "TRACTCE") %>% 
+  select(c(TRACTCE, location, time, variable, mean_value, median_value, pop10_s05000, lu_industrial_p03000, log_m_to_a1, log_m_to_a2, log_m_to_a3, log_m_to_coast, log_m_to_l_airp, log_m_to_comm, geometry))
+
 
 # acs race data
 #glimpse(acs_race)
@@ -270,6 +307,64 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 
 # Descriptive statistics
+
+# Summary and visualizations of air pollutant data
+Comparing the distribution of the median values of NO2 and PM2.5 on the native and log scales. Based on these histograms, it looks like we should log transform both variables for subsequent analyses. 
+```{r}
+# NO2 plot on the native scale
+no2_native <- ggplot(data = no2_stop_clean, aes(median_value)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# NO2 plot on the log scale
+no2_log <- ggplot(data = no2_stop_clean, aes(log_median)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# PM2.5 plot on the native scale
+pm25_native <- ggplot(data = pm25_stop_clean, aes(median_value)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# PM2.5 plot on the log scale
+pm25_log <- ggplot(data = pm25_stop_clean, aes(log_median)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# Add plot type and scale information to the datasets
+no2_native_data <- no2_stop_clean %>%
+  mutate(scale = "Native Scale", pollutant = "NO2", value = median_value)
+
+no2_log_data <- no2_stop_clean %>%
+  mutate(scale = "Log Scale", pollutant = "NO2", value = log_median)
+
+pm25_native_data <- pm25_stop_clean %>%
+  mutate(scale = "Native Scale", pollutant = "PM2.5", value = median_value)
+
+pm25_log_data <- pm25_stop_clean %>%
+  mutate(scale = "Log Scale", pollutant = "PM2.5", value = log_median)
+
+# Combine all datasets
+combined_data <- bind_rows(no2_native_data, no2_log_data, pm25_native_data, pm25_log_data)
+
+# Adjusting the scale levels to reorder the columns
+combined_data <- combined_data %>%
+  mutate(scale = factor(scale, levels = c("Native Scale", "Log Scale"))) 
+
+# Create faceted plot
+faceted_histogram <- ggplot(data = combined_data, aes(value)) +
+  geom_histogram(colour = "black", fill = "white", bins = 30) +
+  facet_grid(pollutant ~ scale, scales = "free_x") +
+  labs(x = "Median Values", y = "Frequency") + 
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank()) 
+
+# Display the plot
+print(faceted_histogram)
+
+```
+
+
 
 ## Descriptive stats for census data
 ```{r}
