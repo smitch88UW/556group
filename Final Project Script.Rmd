@@ -97,6 +97,7 @@ stop_clean <- stop_data %>%
 
 stop_clean <- stop_clean %>% 
   filter(median_value > 0) %>% # what are our thoughts on this?
+  mutate(log_mean = log(mean_value)) %>% 
   mutate(log_median = log(median_value)) %>% 
   filter(log_median > 0) # and on this?
 
