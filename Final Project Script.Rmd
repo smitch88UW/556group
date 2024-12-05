@@ -1,9 +1,10 @@
 ---
 title: "Final Project Script"
-output: html_document:
-  toc: true
-  toc_float: true
-  toc_collapsed: true
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
 toc_depth: 3
 date: "2024-11-21"
 editor_options: 
@@ -50,7 +51,8 @@ pacman::p_load(
     Hmisc,                     # Data description functions like describe()
     scales,                    # Color scale customization for ggplot
     akima,                     # Bivariate interpolation for irregular data
-    downloader                 # Downloading files over HTTP/HTTPS
+    downloader,                 # Downloading files over HTTP/HTTPS
+    tigris
 )
 
 ```
@@ -84,32 +86,6 @@ We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data a
 
 
 ```{r data.cleaning}
-# stop data
-#create variable to differentiate between stop site and collocation site
-stop_data <- stop_data %>% 
-  mutate(SiteType = ifelse(grepl("MS", location), "stop site",
-                       ifelse(grepl("MC", location), "collocation site", NA)))
-
-stop_clean <- stop_data %>% 
-  filter(variable == "no2" | variable == "neph_bscat") %>%
-  filter(SiteType == "stop site") %>% 
-  select(c(runname, time, location, stop_id, instrument_id, variable, mean_value, median_value))   
-
-stop_clean <- stop_clean %>% 
-  filter(median_value > 0) %>% # what are our thoughts on this?
-  mutate(log_mean = log(mean_value)) %>% 
-  mutate(log_median = log(median_value)) %>% 
-  filter(log_median > 0) # and on this?
-
-# Generate NO2 specific dataset
-no2_stop_clean <- stop_clean %>%
-  filter(variable == "no2")
-
-# Generate PM2.5 specific dataset
-pm25_stop_clean <- stop_clean %>% 
-  filter(variable == "neph_bscat")
-
-
 # annual data
 #glimpse(annual_data)
 table(annual_data$variable)
@@ -124,6 +100,37 @@ annual_clean <- annual_data %>%
   filter(variable == "no2" | variable == "pm2.5_ug_m3") %>%
   filter(SiteType == "stop site") %>% 
   select(-c(annual, SiteType))
+
+
+# stop data
+#create variable to differentiate between stop site and collocation site
+stop_data <- stop_data %>% 
+  mutate(SiteType = ifelse(grepl("MS", location), "stop site",
+                       ifelse(grepl("MC", location), "collocation site", NA)))
+
+stop_clean <- stop_data %>% 
+  filter(variable == "no2" | variable == "neph_bscat") %>%
+  filter(SiteType == "stop site") %>% 
+  select(c(runname, time, location, stop_id, instrument_id, variable, mean_value, median_value))   
+
+# Get location coordinates
+stop_coords <- annual_clean %>% select(c("location", "longitude", "latitude")) %>%
+  unique()
+
+stop_clean <- stop_clean %>% 
+  filter(median_value > 0) %>% # what are our thoughts on this? Thought: should we report how many this got rid of?
+  mutate(log_mean = log(mean_value)) %>% 
+  mutate(log_median = log(median_value)) %>% 
+  filter(log_median > 0) %>% # and on this? 
+  left_join(stop_coords)
+
+# Generate NO2 specific dataset
+no2_stop_clean <- stop_clean %>%
+  filter(variable == "no2")
+
+# Generate PM2.5 specific dataset
+pm25_stop_clean <- stop_clean %>% 
+  filter(variable == "neph_bscat")
 
 
 # census data
@@ -284,16 +291,17 @@ ACS vars
 # removed extraneous geographic/census vars
 stop_w_acs <- left_join(stop_clean, mobile_covar_clean, join_by(location==native_id)) %>%
   left_join(acs_simplified, join_by(tract_key==tract_key)) %>%
-  select(-c(GEO_ID, TRACTCE))
+  select(-c(GEO_ID))
 #dim(stop_w_acs) 
 # dimensions are correct (17533 rows)
 
 # created stop data for use in regression for prediction
 stop_for_preds <- stop_w_acs %>% select(c(time, location, instrument_id, variable,
+                                          log_mean,
                                           mean_value, median_value, pop10_s05000,
                                           lu_industrial_p03000, log_m_to_a1, 
                                           log_m_to_a2, log_m_to_a3, log_m_to_coast,
-                                          log_m_to_l_airp, log_m_to_comm))
+                                          log_m_to_l_airp, log_m_to_comm, longitude, latitude))
 
 # create grid data with ACS (for predicting onto and answering Q2/3)
 # should end with 5040 rows
@@ -365,9 +373,12 @@ print(faceted_histogram)
 
 ```
 
-
-
 ## Descriptive stats for census data
+```{r get.indiv.census.tract.levels}
+# group by tract key to get no2 and pm2.5
+  
+```
+
 ```{r}
 library(RColorBrewer)
 # Summarize demographics
@@ -398,7 +409,6 @@ language_usage <- acs_simplified %>%
   mutate(Percentage = Count / sum(Count) * 100)
 print(language_usage)# NOTE: here is the summary stats for the languages
 ```
-
 
 ```{r}
 #Visualization: Demographics, language, and poverty
@@ -461,7 +471,6 @@ dot_plot_data <- bind_rows(
   )
 ```
 
-
 ```{r}
 
 # Improved dot plot with ggplot2 color schemes
@@ -469,7 +478,7 @@ ggplot(dot_plot_data, aes(x = Value, y = Category, color = Type, shape = Type)) 
   geom_point(size = 4) +
   geom_vline(xintercept = seq(0, 60, 10), linetype = "dotted", color = "gray80") +
   labs(
-    title = "Cohort Demographics, Language Usage, and Income Below Poverty Level",
+    title = "Cohort Demographics, Language Usage, and Income\n Below Poverty Level",
     x = "Value (Percentage or Metric Value)",
     y = "Category",
     color = "Type",
@@ -534,8 +543,6 @@ ggplot(stop_w_acs_race_long, aes(x = Race, y = mean_value, fill = variable)) +
 
 ```
 
-
-
 ## Descriptive statistics for stop data
 
 This is super basic at the moment.
@@ -562,6 +569,70 @@ annual_clean %>% group_by(variable) %>% summarise(N=n(),
                                                 median=median(value))
 ```
 
+# Prediction model components
+
+## Variograms
+
+After plotting these variograms, I am a little surprised by the lack of spatial structure there is here. I changed the cutoff to make it smaller, and this didn't show any difference. I then increased the cutoff, and it still doesn't show much spatial structure.
+```{r generate.pm25.variogram}
+#Generate uk variograms for PM2.5
+
+lambert_proj <- "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=39 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"
+
+#transform stop data to Lambert for distances 
+stop_for_preds <- st_as_sf(stop_for_preds, coords = c('longitude', 'latitude'), crs = 4326) %>%
+  # # convert to a meters CRS
+  st_transform(lambert_proj)
+
+# Estimate the variogram with a covariate predictor
+v.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="neph_bscat")),
+                  cutoff=100000)
+
+plot(v.uk)
+
+# Fit the variogram model with multiple options (Exponential, Spherical, Matern)
+# note that this may have convergence issues. If so, you can try selecting one variogram model instead. You can also give it initial values for range, nugget etc. based on looking at the variogram cloud.
+
+# sometimes has convergence issues 
+m.uk <- fit.variogram(v.uk, vgm(c("Exp", "Sph", "Mat")))
+
+# Alternatively, you could fit the variogram with modified initial values. This still has convergence issues.
+# m.uk <- fit.variogram(v.uk, vgm("Exp", nugget = 0.01, psill = 0.03, range = 15000))
+
+
+# Display the selected variogram model parameters
+m.uk
+
+# Plot the empirical variogram with the fitted model
+plot(v.uk, model = m.uk)
+```
+
+The variogram for NO2 is particularly mysterious when the cutoff is increased to 100,000... the semivariance gets lower with distance which is counter to what we have learned about how things are correlated in space... So I'm keeping the cutoff the default.
+```{r generate.no2.variogram}
+#Generate variograms for no2
+
+# Estimate the variogram with a covariate predictor
+v.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="no2")))
+                  #,cutoff=5000)
+
+plot(v.uk)
+
+# Fit the variogram model with multiple options (Exponential, Spherical, Matern)
+# note that this may have convergence issues. If so, you can try selecting one variogram model instead. You can also give it initial values for range, nugget etc. based on looking at the variogram cloud.
+
+# sometimes has convergence issues 
+m.uk <- fit.variogram(v.uk, vgm(c("Exp", "Sph", "Mat")))
+
+# Alternatively, you could fit the variogram with modified initial values. This still has convergence issues.
+# m.uk <- fit.variogram(v.uk, vgm("Exp", nugget = 0.01, psill = 0.03, range = 15000))
+
+
+# Display the selected variogram model parameters
+m.uk
+
+# Plot the empirical variogram with the fitted model
+plot(v.uk, model = m.uk)
+```
 
 #Trying to answer questions
 ```{r a useful plot to include, eval=T, echo = T, include = T}
@@ -599,10 +670,10 @@ pm25_stop_acs_clean <- stop_w_acs_clean %>% filter(variable == "neph_bscat")
 
 no2_stop_acs_clean <- stop_w_acs_clean %>% filter(variable == "no2")
 
-pm25_annual_data <- annual
+pm25_annual_data <- annual_data
 
-View(pm25_stop_acs_clean)
-View(no2_stop_acs_clean)
+# View(pm25_stop_acs_clean)
+# View(no2_stop_acs_clean)
 
 # Fit the linear regression model
 pm25_model <- lm(
@@ -665,6 +736,12 @@ newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
 library(ggplot2)
 library(sf)
 
+# Define the CRS (EPSG:32148 - Washington State Plane North, NAD83)
+lambert_crs <- st_crs(32148)
+
+# Reproject the spatial data to Lambert Conformal Conic
+#data_lambert <- st_transform(census_shapefile, crs = lambert_crs)
+
 # Ensure the dataset is an sf object (it likely already is)
 newgrid_w_acs2 <- st_as_sf(newgrid_w_acs2)
 
@@ -672,7 +749,7 @@ newgrid_w_acs2 <- st_as_sf(newgrid_w_acs2)
 st_crs(newgrid_w_acs2)
 
 # Transform to Lambert Conformal Conic projection (if not already)
-newgrid_w_acs2_lambert <- st_transform(newgrid_w_acs2, crs = 5070)
+newgrid_w_acs2_lambert <- st_transform(newgrid_w_acs2, crs = lambert_crs)
 
 # Plot the predicted PM2.5 concentrations
 ggplot(newgrid_w_acs2_lambert) +
@@ -680,6 +757,26 @@ ggplot(newgrid_w_acs2_lambert) +
   scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + # Color-blind-friendly palette
   labs(
     title = "Predicted PM2.5 Concentrations by Census Tract",
+    subtitle = "Lambert Conformal Conic Projection",
+    caption = "Data: ACS and Mobile Monitoring",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 0),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+
+# percent below poverty map
+ggplot(newgrid_w_acs2_lambert) +
+  geom_sf(aes(fill = Percent_Below_Poverty), color = NA) +
+  scale_fill_viridis_c(option = "plasma", name = "Percent") + # Color-blind-friendly palette
+  labs(
+    title = "Percent Below Poverty by Census Tract",
     subtitle = "Lambert Conformal Conic Projection",
     caption = "Data: ACS and Mobile Monitoring",
     x = "Longitude",
