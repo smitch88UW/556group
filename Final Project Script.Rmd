@@ -1049,7 +1049,49 @@ ggplot() +
   )
 
 ```
-#NO2 and poverty
+#Linear regression Predicted NO2 and poverty
+RESULTS:
+The relationship between predicted nitrogen dioxide (NO2) levels and the percentage of the population below the poverty line was examined using linear regression. The model revealed a significant positive association between poverty and NO2 levels (Estimate = 0.143, p < 0.001), indicating that areas with higher poverty rates are associated with higher predicted NO2 concentrations. The model explained approximately 17.6% of the variance in predicted NO2 levels (Adjusted R-squared = 0.176). The intercept suggests a baseline NO2 level of 7.39 in areas with no population below the poverty line. These findings highlight a potential environmental justice concern, with higher NO2 levels disproportionately affecting lower-income communities.
+```{r}
+colnames(newgrid_king_county)
+# Load necessary library
+library(tidyverse)
+
+# Load the dataset
+data <- newgrid_king_county
+
+# Clean the data: Ensure columns are numeric and remove invalid values
+data <- data %>%
+  mutate(
+    predicted_no2 = as.numeric(as.character(predicted_no2)),
+    Percent_Below_Poverty = as.numeric(as.character(Percent_Below_Poverty))  # Replace with the actual column name for below poverty
+  ) %>%
+  filter(
+    !is.na(predicted_no2),
+    !is.na(Percent_Below_Poverty),
+    is.finite(predicted_no2),
+    is.finite(Percent_Below_Poverty)
+  )
+
+# Fit the linear regression model
+model_poverty <- lm(predicted_no2 ~ Percent_Below_Poverty, data = data)
+
+# Summarize the model
+summary(model_poverty)
+
+# Optional: Plot the relationship
+ggplot(data, aes(x = Percent_Below_Poverty, y = predicted_no2)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(
+    title = "Linear Regression: Predicted NO2 vs Below Poverty",
+    x = "Percent Below Poverty",
+    y = "Predicted NO2"
+  )
+
+```
+
+#Map of Predicted NO2 and poverty
 ```{r}
 library(ggplot2)
 library(sf)
@@ -1083,15 +1125,21 @@ newgrid_king_county_filtered <- st_transform(newgrid_king_county, crs = 4326)
 # Plot the NO2 and Poverty map
 ggplot() +
   annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap basemap
-  geom_sf(data = newgrid_king_county_filtered, aes(fill = bivar_category), color = NA, alpha = 0.8) +
+  geom_sf(
+    data = newgrid_king_county_filtered,
+    aes(fill = bivar_category),
+    color = NA,
+    alpha = 0.8
+  ) +
   scale_fill_manual(
     values = bivariate_colors_no2,
     name = "NO2 & Poverty Levels",
+    breaks = c("low_low", "low_high", "high_low", "high_high"),  # Ensures the order matches the color definitions
     labels = c(
-      "Low NO2, Low Poverty",
-      "Low NO2, High Poverty",
-      "High NO2, Low Poverty",
-      "High NO2, High Poverty"
+      "Low NO2, Low Poverty",   # Corresponds to "low_low"
+      "Low NO2, High Poverty",  # Corresponds to "low_high"
+      "High NO2, Low Poverty",  # Corresponds to "high_low"
+      "High NO2, High Poverty"  # Corresponds to "high_high"
     )
   ) +
   labs(
@@ -1114,7 +1162,440 @@ ggplot() +
   )
 
 ```
+#Linear regression of predicted NO2 and language diversity
+```{r}
+# Load necessary library
+library(tidyverse)
 
+# Load the dataset
+data <- newgrid_king_county
+
+# Clean the data: Ensure columns are numeric and remove invalid values
+data <- data %>%
+  mutate(
+    predicted_no2 = as.numeric(as.character(predicted_no2)),
+    Language_other_than_English = as.numeric(as.character(Language_other_than_English))
+  ) %>%
+  filter(
+    !is.na(predicted_no2), 
+    !is.na(Language_other_than_English),
+    is.finite(predicted_no2), 
+    is.finite(Language_other_than_English)
+  )
+
+# Fit the linear regression model
+model <- lm(predicted_no2 ~ Language_other_than_English, data = data)
+
+# Summarize the model
+summary(model)
+
+# Optional: Plot the relationship
+ggplot(data, aes(x = Language_other_than_English, y = predicted_no2)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(
+    title = "Linear Regression: Predicted NO2 vs Language Other Than English",
+    x = "Language Other Than English",
+    y = "Predicted NO2"
+  )
+
+```
+
+#Map of Predicted NO2 and language diversity
+
+This map visualizes the relationship between predicted nitrogen dioxide (NO₂) levels and language diversity in a specific geographic area, likely in Washington State, as it includes landmarks like Seattle and Tacoma. It is categorized into four distinct levels of NO₂ and language diversity
+
+```{r}
+library(tidyverse)
+library(sf)
+library(ggspatial)
+library(scales)
+
+# Ensure columns are numeric and remove invalid values
+newgrid_king_county <- newgrid_king_county %>%
+  mutate(
+    predicted_no2 = as.numeric(as.character(predicted_no2)),
+    Language_other_than_English = as.numeric(as.character(Language_other_than_English))
+  ) %>%
+  filter(
+    !is.na(predicted_no2), 
+    !is.na(Language_other_than_English),
+    is.finite(predicted_no2), 
+    is.finite(Language_other_than_English)
+  ) %>%
+  mutate(
+    no2_scaled = rescale(predicted_no2, to = c(0, 1)),
+    language_scaled = rescale(Language_other_than_English, to = c(0, 1)),
+    bivar_category = case_when(
+      no2_scaled <= 0.5 & language_scaled <= 0.5 ~ "low_low",
+      no2_scaled <= 0.5 & language_scaled > 0.5 ~ "low_high",
+      no2_scaled > 0.5 & language_scaled <= 0.5 ~ "high_low",
+      no2_scaled > 0.5 & language_scaled > 0.5 ~ "high_high"
+    )
+  )
+
+# Ensure it's an sf object and transform CRS
+if (!inherits(newgrid_king_county, "sf")) {
+  newgrid_king_county <- st_as_sf(newgrid_king_county, coords = c("longitude", "latitude"), crs = 4326)
+}
+newgrid_king_county_filtered <- st_transform(newgrid_king_county, crs = 4326)
+
+# Define the bivariate color palette
+bivariate_colors_no2 <- c(
+  "low_low" = "#f0f0f0", 
+  "low_high" = "#9ecae1", 
+  "high_low" = "#fc9272", 
+  "high_high" = "#67000d"
+)
+
+# Plot the map
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +
+  geom_sf(
+    data = newgrid_king_county_filtered,
+    aes(fill = bivar_category),
+    color = NA,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(
+    values = bivariate_colors_no2,
+    name = "NO2 & Language Levels",
+    breaks = c("low_low", "low_high", "high_low", "high_high"),
+    labels = c(
+      "Low NO2, Low Language Diversity",
+      "Low NO2, High Language Diversity",
+      "High NO2, Low Language Diversity",
+      "High NO2, High Language Diversity"
+    )
+  ) +
+  labs(
+    title = "Predicted NO2 and Language Diversity",
+    caption = "Data Sources: ACS, Mobile Monitoring, OpenStreetMap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = "right",
+    legend.box = "vertical",
+    panel.background = element_rect(fill = "transparent", color = NA)
+  )
+
+```
+
+#MLR racial diversity and predicted NO2
+
+Narrative for write up: 
+A multiple linear regression model examined the relationship between predicted nitrogen dioxide (NO2) levels and race-related variables. Areas with higher proportions of Black/African American and "Two or More Races" residents were associated with increased NO2 levels, while areas with higher proportions of White, American Indian and Alaska Native (AIAN), and Asian residents had lower predicted NO2 levels. The category "Hawaiian/Pacific Islander" showed no significant association with NO2 levels. The findings highlight disparities in environmental exposures across racial groups, with potential implications for public health and environmental justice. Targeted interventions are needed to address elevated NO2 levels in disproportionately affected communities.
+```{r}
+# Load necessary libraries
+library(tidyverse)
+
+# Load the dataset
+data <- newgrid_king_county
+
+# Clean the data: Ensure all relevant columns are numeric and remove invalid values
+data <- data %>%
+  mutate(
+    predicted_no2 = as.numeric(as.character(predicted_no2)),
+    White = as.numeric(as.character(White)),
+    Black_AfricanAmerican = as.numeric(as.character(Black_AfricanAmerican)),
+    AIAN = as.numeric(as.character(AIAN)),
+    Asian = as.numeric(as.character(Asian)),
+    Hawaiian_PacificIslander = as.numeric(as.character(Hawaiian_PacificIslander)),
+    Other_alone = as.numeric(as.character(Other_alone)),
+    X2ormore = as.numeric(as.character(X2ormore)),
+    X2ormore_andsomeother = as.numeric(as.character(X2ormore_andsomeother)),
+    X3ormore = as.numeric(as.character(X3ormore))
+  ) %>%
+  filter(
+    !is.na(predicted_no2),
+    is.finite(predicted_no2),
+    !is.na(White),
+    !is.na(Black_AfricanAmerican),
+    !is.na(AIAN),
+    !is.na(Asian),
+    !is.na(Hawaiian_PacificIslander),
+    !is.na(Other_alone),
+    !is.na(X2ormore),
+    !is.na(X2ormore_andsomeother),
+    !is.na(X3ormore)
+  )
+
+# Fit the multiple linear regression model (excluding `_ME` variables)
+model <- lm(predicted_no2 ~ White + 
+            Black_AfricanAmerican + 
+            AIAN + 
+            Asian + 
+            Hawaiian_PacificIslander + 
+            Other_alone + 
+            X2ormore + 
+            X2ormore_andsomeother + 
+            X3ormore,
+            data = data)
+
+# Summarize the model
+summary(model)
+
+# Extract the coefficients from the model
+model_summary <- summary(model)
+coefficients_table <- as.data.frame(model_summary$coefficients)
+
+# Rename columns for clarity
+colnames(coefficients_table) <- c("Estimate", "Std. Error", "t value", "Pr(>|t|)")
+
+# Add row names as a column for variable names
+coefficients_table <- tibble::rownames_to_column(coefficients_table, "Variable")
+
+# Print the table in the console
+print(coefficients_table)
+
+# Optional: Use kable for better visualization in RMarkdown or RStudio
+library(knitr)
+kable(coefficients_table, caption = "Regression Results for Predicted NO2 and Race Variables")
+
+
+# Optional: Diagnostics for the model
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+plot(model)
+
+```
+
+#Racial diversity - NOTE: size needs to be explored so maps are less squished
+
+Text for write up: This map visualizes the racial and ethnic composition of King County, Washington, by census tract, with an OpenStreetMap background for spatial context. Each panel represents the percentage distribution of a specific racial or ethnic group, including American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. The color gradient indicates the concentration, with darker shades representing higher percentages. This visual provides a detailed geographic understanding of demographic patterns across the county. Data sources include ACS and OpenStreetMap.
+```{r}
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(tidyr)
+library(ggspatial)  # For adding OpenStreetMap tiles
+
+# Define the racial/ethnic variables and their readable names
+selected_race_vars <- c(
+  "Black_AfricanAmerican",
+  "White",
+  "Asian",
+  "AIAN",
+  "Hawaiian_PacificIslander",
+  "HispanicorLatino"
+)
+
+readable_race_names <- c(
+  "Black or African American",
+  "White",
+  "Asian",
+  "American Indian/Alaskan Native",
+  "Hawaiian or Pacific Islander",
+  "Hispanic or Latino"
+)
+
+# Ensure CRS is consistent for mapping
+newgrid_king_county <- st_transform(newgrid_king_county, crs = 4326)
+
+# Pivot dataset to long format for mapping multiple racial groups
+newgrid_long <- newgrid_king_county %>%
+  select(geometry, all_of(selected_race_vars)) %>%
+  pivot_longer(
+    cols = all_of(selected_race_vars),
+    names_to = "Race",
+    values_to = "Percentage"
+  ) %>%
+  mutate(
+    Race = recode(Race, 
+                  "Black_AfricanAmerican" = "Black or African American",
+                  "White" = "White",
+                  "Asian" = "Asian",
+                  "AIAN" = "American Indian/Alaskan Native",
+                  "Hawaiian_PacificIslander" = "Hawaiian or Pacific Islander",
+                  "HispanicorLatino" = "Hispanic or Latino")
+  )
+
+# Create the map with OpenStreetMap as the background
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # Add OpenStreetMap tiles as the base layer
+  geom_sf(
+    data = newgrid_long,
+    aes(fill = Percentage, geometry = geometry),
+    color = NA,
+    alpha = 0.8
+  ) +
+  facet_wrap(~ Race, ncol = 2) +  # Facet by race for multiple maps
+  scale_fill_viridis_c(
+    name = "Percentage",
+    option = "plasma",
+    na.value = "grey90"
+  ) +
+  labs(
+    title = "Spatial Distributon of Dominant Race per Census Tract",
+    caption = "Data Sources: ACS, OpenStreetMap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 10, face = "bold", hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = "right",
+    panel.background = element_rect(fill = "transparent", color = NA)
+  )
+```
+
+#Racial map chloropleth
+Text for write up: 
+This map displays the dominant racial or ethnic group by census tract in Snohomish, Pierce, and King County, Washington, overlaid on an OpenStreetMap basemap for geographic context. Each tract is color-coded to represent the racial or ethnic group with the highest proportion of residents. Groups represented include American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. This visualization highlights the spatial distribution of demographic dominance across the county, providing insights into the region's racial and ethnic diversity. Data sources include the American Community Survey (ACS), Mobile Monitoring, and OpenStreetMap.
+```{r}
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(ggspatial)  # For adding OpenStreetMap tiles
+
+# Ensure CRS consistency for OpenStreetMap compatibility
+newgrid_king_county <- st_transform(newgrid_king_county, crs = 4326)
+
+# Normalize racial/ethnic data to 0–1 range
+newgrid_normalized <- newgrid_king_county %>%
+  mutate(across(all_of(selected_race_vars), ~ rescale(.x, to = c(0, 1))))
+
+# Identify the dominant race in each tract
+newgrid_normalized <- newgrid_normalized %>%
+  rowwise() %>%
+  mutate(
+    dominant_race = selected_race_vars[which.max(c_across(all_of(selected_race_vars)))]
+  ) %>%
+  ungroup() %>%
+  mutate(
+    dominant_race = recode(dominant_race,
+                           "Black_AfricanAmerican" = "Black or African American",
+                           "White" = "White",
+                           "Asian" = "Asian",
+                           "AIAN" = "American Indian/Alaskan Native",
+                           "Hawaiian_PacificIslander" = "Hawaiian or Pacific Islander",
+                           "HispanicorLatino" = "Hispanic or Latino")
+  )
+
+# Assign colors for each dominant race
+race_colors <- c(
+  "Black or African American" = "#fc9272",   # Light red
+  "White" = "#f0f0f0",                       # Light grey
+  "Asian" = "#9ecae1",                       # Light blue
+  "American Indian/Alaskan Native" = "#a1d99b",  # Light green
+  "Hawaiian or Pacific Islander" = "#bcbddc",    # Light purple
+  "Hispanic or Latino" = "#fdae6b"           # Light orange
+)
+
+# Plot the map using OpenStreetMap tiles
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # Add OpenStreetMap tiles as the base layer
+  geom_sf(
+    data = newgrid_normalized,
+    aes(fill = dominant_race),
+    color = NA,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(
+    values = race_colors,
+    name = "Prominent Race"
+  ) +
+  labs(
+    title = "Spatial Distribution of Race by Census Tract",
+    subtitle = "Dominant racial group per census tract",
+    caption = "Data Sources: ACS, OpenStreetMap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = "right",
+    panel.background = element_rect(fill = "transparent", color = NA)
+  )
+
+
+```
+#Language diversity
+Text for write up: 
+This map visualizes language use at home by census tract in Snohomish, Pierce, and King County, Washington, with an OpenStreetMap background for geographic context. The two panels represent the percentage distribution of households where English is the primary language ("English Only") and households where other languages are predominantly spoken ("Language Other Than English").
+
+The left panel highlights areas where English is predominantly spoken, with darker shades indicating higher percentages. The right panel illustrates areas where other languages dominate, showing significant linguistic diversity across the region. The color gradient reflects the proportion of households, from lower percentages in blue to higher percentages in yellow. This map provides insights into the spatial distribution of language use in the county. Data sources include the American Community Survey (ACS) and OpenStreetMap.
+
+```{r}
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(tidyr)
+library(ggspatial)  # For adding OpenStreetMap tiles
+
+# Define the language variables and their readable names
+selected_language_vars <- c(
+  "English_only",
+  "Language_other_than_English"
+)
+
+readable_language_names <- c(
+  "English Only",
+  "Language Other Than English"
+)
+
+# Ensure CRS is consistent for mapping
+newgrid_king_county <- st_transform(newgrid_king_county, crs = 4326)
+
+# Pivot dataset to long format for mapping language groups
+newgrid_long_language <- newgrid_king_county %>%
+  select(geometry, all_of(selected_language_vars)) %>%
+  pivot_longer(
+    cols = all_of(selected_language_vars),
+    names_to = "Language",
+    values_to = "Percentage"
+  ) %>%
+  mutate(
+    Language = recode(Language, 
+                      "English_only" = "English Only",
+                      "Language_other_than_English" = "Language Other Than English")
+  )
+
+# Create the map with OpenStreetMap as the background
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # Add OpenStreetMap tiles as the base layer
+  geom_sf(
+    data = newgrid_long_language,
+    aes(fill = Percentage, geometry = geometry),
+    color = NA,
+    alpha = 0.8
+  ) +
+  facet_wrap(~ Language, ncol = 2) +  # Facet by language group
+  scale_fill_viridis_c(
+    name = "Percentage",
+    option = "plasma",
+    na.value = "grey90"
+  ) +
+  labs(
+    title = "Spatial Distribution of Language Diversity by Census Tract",
+    caption = "Data Sources: ACS, OpenStreetMap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = "right",
+    panel.background = element_rect(fill = "transparent", color = NA)
+  )
+
+```
 
 
 
