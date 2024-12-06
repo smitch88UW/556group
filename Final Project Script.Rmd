@@ -53,7 +53,9 @@ pacman::p_load(
     scales,                    # Color scale customization for ggplot
     akima,                     # Bivariate interpolation for irregular data
     downloader,                 # Downloading files over HTTP/HTTPS
-    tigris
+    tigris,
+    RColorBrewer,
+    scales
 )
 
 ```
@@ -152,7 +154,7 @@ census_clean <- census_shapefile %>%
 grid_covar_clean <- grid_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) %>%
-  select(c(location_id, native_id, tract_key, m_to_a1, m_to_a2, m_to_a3, pop10_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000)) %>%
+  select(c(location_id, native_id, tract_key, m_to_a1, m_to_a2, m_to_a3, pop10_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000, longitude, latitude)) %>%
   mutate(log_m_to_a1 = log(m_to_a1), log_m_to_a2=log(m_to_a2), log_m_to_a3=log(m_to_a3),
          log_m_to_coast=log(m_to_coast), log_m_to_l_airp=log(m_to_l_airp), 
          log_m_to_comm=log(m_to_comm)) %>% 
@@ -365,7 +367,7 @@ combined_data <- combined_data %>%
 faceted_histogram <- ggplot(data = combined_data, aes(value)) +
   geom_histogram(colour = "black", fill = "white", bins = 30) +
   facet_grid(pollutant ~ scale, scales = "free_x") +
-  labs(x = "Median Values", y = "Frequency") + 
+  labs(x = "Median Values", y = "Frequency", title="Distribution of Median Values") + 
   theme_minimal() +
   theme(panel.grid.minor = element_blank()) 
 
@@ -381,7 +383,6 @@ print(faceted_histogram)
 ```
 
 ```{r}
-library(RColorBrewer)
 # Summarize demographics
 demographics <- acs_simplified %>%
   select(White, Black_AfricanAmerican, AIAN, Asian, Hawaiian_PacificIslander, HispanicorLatino, Other_alone) %>%
@@ -392,9 +393,9 @@ demographics <- acs_simplified %>%
 # Summarize income statistics
 percentbelowpoverty_stats <- acs_simplified %>%
   summarise(
-    Mean_Income = mean(Percent_Below_Poverty, na.rm = TRUE),
-    Median_Income = median(Percent_Below_Poverty, na.rm = TRUE),
-    SD_Income = sd(Percent_Below_Poverty, na.rm = TRUE)
+    Mean_Percent_Below_Poverty = mean(Percent_Below_Poverty, na.rm = TRUE),
+    Median_Percent_Below_Poverty = median(Percent_Below_Poverty, na.rm = TRUE),
+    SD_Percent_Below_Poverty = sd(Percent_Below_Poverty, na.rm = TRUE)
   )
 print(percentbelowpoverty_stats)#NOTE: this is the mean/median/sd percent of the pop that is below FPL
 
@@ -411,12 +412,12 @@ language_usage <- acs_simplified %>%
 print(language_usage)# NOTE: here is the summary stats for the languages
 ```
 
+Delete below chunk? Does not make sense.
+
 ```{r}
 #Visualization: Demographics, language, and poverty
-# Load required libraries
-library(ggplot2)
-library(dplyr)
 
+# Where are these Count values from? What is this?
 
 # plot
 demographics <- data.frame(
@@ -433,7 +434,7 @@ language_usage <- data.frame(
   mutate(Percentage = Count / sum(Count) * 100, Type = 'Languages (Percentage)')
 
 percentbelowpoverty_stats <- data.frame(
-  Metric = c('Mean_Income'),
+  Metric = c('Mean_Percent_Below_Poverty'),
   Value = c(20), # Use a single value
   Type = 'Income Below Federal Poverty Level'
 )
@@ -472,7 +473,13 @@ dot_plot_data <- bind_rows(
   )
 ```
 
-```{r}
+```{r cohort.demographics table}
+## TO-DO
+
+```
+
+```{r, eval=FALSE}
+# This dot plot is misleading and confusing - what does income of 20 mean? The percentages are confusing and this information would be easier to understand in a table.
 
 # Improved dot plot with ggplot2 color schemes
 ggplot(dot_plot_data, aes(x = Value, y = Category, color = Type, shape = Type)) +
@@ -500,12 +507,8 @@ ggplot(dot_plot_data, aes(x = Value, y = Category, color = Type, shape = Type)) 
 
 ```
 
-```{r}
+```{r, eval=FALSE}
 #---------------------- Exploring pollutant data with language
-# Load required libraries
-library(ggplot2)
-library(dplyr)
-library(tidyr)
 
 # Load your dataset
 stop_w_acs <- read.csv("stop_w_acs.csv")
@@ -541,7 +544,7 @@ ggplot(stop_w_acs_race_long, aes(x = Race, y = mean_value, fill = variable)) +
     legend.text = element_text(size = 10)
   )
 
-
+## This plot doesn't make much sense - it looks like each stop has every Race category, so when you plot the values, they're all the same. I don't think it makes sense to plot every stop by race, because stops don't have a race. (Cecilia)
 ```
 
 ## Descriptive statistics for stop data
@@ -575,6 +578,8 @@ annual_clean %>% group_by(variable) %>% summarise(N=n(),
 ## Variograms
 
 After plotting these variograms, I am a little surprised by the lack of spatial structure there is here. I changed the cutoff to make it smaller, and this didn't show any difference. I then increased the cutoff, and it still doesn't show much spatial structure.
+
+TO-DO for the variograms -- add more of the code from Lab 6 to look at the cloud variograms and more.
 ```{r generate.pm25.variogram}
 #Generate uk variograms for PM2.5
 
@@ -634,12 +639,156 @@ m.uk
 plot(v.uk, model = m.uk)
 ```
 
+## Predict with Universal Kriging 
+This code was taken from the Week 6 Lab, and we need to predict on the grid level (for mapping) and the block level (for testing associations, as the grid can underpredict). We can try just mapping with the block level too.
+
+```{r check.for.linearity}
+# We could consider checking for linearity for inclusion of additional variables from Mercer et al 2011
+
+# CODE TO EDIT FROM LAB 6: Plot to evaluate linearity between X and X
+ggplot(fall, aes(x = Pop_5000, y = ln_nox)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth() +
+  labs(x = "Population within 5000 meters", y = "Log-transformed NOx", 
+       title = "Relationship between Pop_5000 and ln_nox")
+
+```
+
+```{r universal.kriging.prediction.pm25.grid, warning=FALSE}
+#transform stop data to Lambert for distances 
+grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
+  # # convert to a meters CRS
+  st_transform(lambert_proj)
+
+# ---- Universal Kriging Prediction Code from Lab 6 ----
+
+# Fit the universal kriging model for PM2.5 and predict on the grid
+ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
+                 newdata = grid_for_preds, # CRS in meters
+                 model = m.uk)
+
+# Calculate standard errors to assess prediction uncertainty across locations
+ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
+
+# Plot UK predictions
+pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5)")
+
+# Plot UK prediction standard errors
+pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)")
+
+```
+
+```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE}
+### STILL NEED TO EDIT
+
+
+
+#transform stop data to Lambert for distances 
+grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
+  # # convert to a meters CRS
+  st_transform(lambert_proj)
+
+# ---- Universal Kriging Prediction Code from Lab 6 ----
+
+# Fit the universal kriging model for PM2.5 and predict on the grid
+ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
+                 newdata = grid_for_preds, # CRS in meters
+                 model = m.uk)
+
+# Calculate standard errors to assess prediction uncertainty across locations
+ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
+
+# Plot UK predictions
+pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5)")
+
+# Plot UK prediction standard errors
+pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)")
+
+```
+
+```{r universal.kriging.prediction.no2.grid, warning=FALSE}
+### STILL NEED TO EDIT
+
+
+
+#transform stop data to Lambert for distances 
+grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
+  # # convert to a meters CRS
+  st_transform(lambert_proj)
+
+# ---- Universal Kriging Prediction Code from Lab 6 ----
+
+# Fit the universal kriging model for PM2.5 and predict on the grid
+ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
+                 newdata = grid_for_preds, # CRS in meters
+                 model = m.uk)
+
+# Calculate standard errors to assess prediction uncertainty across locations
+ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
+
+# Plot UK predictions
+pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5)")
+
+# Plot UK prediction standard errors
+pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)")
+
+```
+
+```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE}
+### STILL NEED TO EDIT
+
+
+#transform stop data to Lambert for distances 
+grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
+  # # convert to a meters CRS
+  st_transform(lambert_proj)
+
+# ---- Universal Kriging Prediction Code from Lab 6 ----
+
+# Fit the universal kriging model for PM2.5 and predict on the grid
+ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
+                 newdata = grid_for_preds, # CRS in meters
+                 model = m.uk)
+
+# Calculate standard errors to assess prediction uncertainty across locations
+ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
+
+# Plot UK predictions
+pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5)")
+
+# Plot UK prediction standard errors
+pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)")
+
+```
+
+
 #Trying to answer questions
+
+Percent below poverty and pollutant concentrations are not linearly related, as evidenced by the below scatter plot.
+
 ```{r a useful plot to include, eval=T, echo = T, include = T}
-#Box plot of pollutant concentrations by %below FPL...need to fix x axis so its more convinving (Jorge)
+#Box plot of pollutant concentrations by %below FPL...need to fix x axis so its more convincing (Jorge)
+
+## I think to make it more convincing, we should just use a scatterplot, as these are both continuous variables and we're interested in the association (Cecilia)
 ggplot(stop_w_acs, aes(x = (Percent_Below_Poverty), y = mean_value, fill = variable)) +
   geom_boxplot() +
   labs(title = "Pollutant Concentrations by Income Level", x = "Percent Below Poverty", y = "Pollutant Concentration") +
+  theme_minimal()
+
+## This scatterplot is not compelling at all - I don't think we should really include this. We can say they're not linearly related. (Cecilia)
+ggplot(stop_w_acs %>% filter(variable=="neph_bscat"), aes(x = (Percent_Below_Poverty), y = mean_value)) +
+  geom_point(shape=1) +
+  labs(title = "PM2.5 Concentrations by Income Level", x = "Percent Below Poverty", y = "Pollutant Concentration") +
+  theme_minimal()
+
+ggplot(stop_w_acs %>% filter(variable=="no2"), aes(x = (Percent_Below_Poverty), y = mean_value)) +
+  geom_point(shape=1) +
+  labs(title = "PM2.5 Concentrations by Income Level", x = "Percent Below Poverty", y = "Pollutant Concentration") +
   theme_minimal()
 
 ```
@@ -647,6 +796,8 @@ ggplot(stop_w_acs, aes(x = (Percent_Below_Poverty), y = mean_value, fill = varia
 ```{r}
 #NOTE: This needs to be played with/cleaned up but it works
 # Clean the data by removing rows with NA or non-finite values in the variables used for modeling
+
+# Edited to take out the is.finite -- why would we care about that? (Cecilia)
 stop_w_acs_clean <- stop_w_acs %>%
   filter(
     !is.na(mean_value) & 
@@ -654,13 +805,13 @@ stop_w_acs_clean <- stop_w_acs %>%
     !is.na(White) & 
     !is.na(Language_other_than_English) & 
     !is.na(log_m_to_a1) & 
-    !is.na(log_m_to_comm) &
-    is.finite(mean_value) &
-    is.finite(Percent_Below_Poverty) &
-    is.finite(White) &
-    is.finite(Language_other_than_English) &
-    is.finite(log_m_to_a1) &
-    is.finite(log_m_to_comm)
+    !is.na(log_m_to_comm) 
+    # is.finite(mean_value) &
+    # is.finite(Percent_Below_Poverty) &
+    # is.finite(White) &
+    # is.finite(Language_other_than_English) &
+    # is.finite(log_m_to_a1) &
+    # is.finite(log_m_to_comm)
   )
 
 pm25_stop_acs_clean <- stop_w_acs_clean %>% filter(variable == "neph_bscat")
@@ -672,24 +823,24 @@ pm25_annual_data <- annual_data
 # View(pm25_stop_acs_clean)
 # View(no2_stop_acs_clean)
 
-# Fit the linear regression model
-pm25_model <- lm(
-  mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp, 
-  data = pm25_stop_acs_clean
-)
-
-no2_model <- lm(
-  mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp,
-  data = no2_stop_acs_clean
-)
-
-# Display the summary of the model
-summary(pm25_model)
-summary(no2_model)
-
-# Plot residuals vs. fitted values to check assumptions
-plot(pm25_model, which = 1, main = "Residuals vs Fitted")
-plot(no2_model, which =1, main = "Residuals vs Fitted")
+# Fit the linear regression model -- this does not incorporate universal kriging, so I am commenting it out
+# pm25_model <- lm(
+#   mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp, 
+#   data = pm25_stop_acs_clean
+# )
+# 
+# no2_model <- lm(
+#   mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp,
+#   data = no2_stop_acs_clean
+# )
+# 
+# # Display the summary of the model
+# summary(pm25_model)
+# summary(no2_model)
+# 
+# # Plot residuals vs. fitted values to check assumptions
+# plot(pm25_model, which = 1, main = "Residuals vs Fitted")
+# plot(no2_model, which =1, main = "Residuals vs Fitted")
 ```
 
 ```{r}
@@ -713,20 +864,19 @@ grid_w_acs <- grid_w_acs %>%
     !is.na(log_m_to_comm)
   )
 
+## These do not account for spatial structure since they do not have UK, commenting them out (Cecilia)
 # Predict PM2.5 concentrations
-grid_w_acs$predicted_pm25 <- predict(pm25_model, newdata = grid_w_acs)
+# grid_w_acs$predicted_pm25 <- predict(pm25_model, newdata = grid_w_acs)
 
 # Display the first few rows of the predictions
-head(grid_w_acs$predicted_pm25)
+# head(grid_w_acs$predicted_pm25)
 
 # Predict PM2.5 concentrations
-grid_w_acs$predicted_no2 <- predict(no2_model, newdata = grid_w_acs)
+# rid_w_acs$predicted_no2 <- predict(no2_model, newdata = grid_w_acs)
 
 # Display the first few rows of the predictions
-head(grid_w_acs$predicted_no2)
+# head(grid_w_acs$predicted_no2)
 
-
-library(sf)
 # Assuming `grid_w_acs` has a column `tract_key`
 
 newgrid_w_acs <- grid_w_acs %>%    mutate(TRACTCE = substr(as.character(tract_key), 
@@ -735,6 +885,7 @@ newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
 
 ```
 
+Note: I likely broke this below because I commented out the incorrect predictions (Cecilia).
 ```{r}
 # Define the CRS (EPSG:32148 - Washington State Plane North, NAD83)
 lambert_crs <- st_crs(32148)
@@ -814,11 +965,6 @@ ggplot(newgrid_w_acs2_lambert) +
 ```
 
 ```{r}
-# Load necessary libraries
-library(ggplot2)
-library(sf)
-library(ggspatial)
-
 # Ensure the data is in EPSG:4326 (latitude/longitude)
 newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326)
 
@@ -947,10 +1093,6 @@ ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level fo
 #### Stephanie and Jorge's additions
 #Poverty and PM2.5 map
 ```{r, include=F}
-library(ggplot2)
-library(sf)
-library(dplyr)
-
 # Normalize PM2.5 and Poverty levels to a 0–1 range
 newgrid_king_county <- newgrid_king_county %>%
   mutate(
@@ -1054,8 +1196,6 @@ RESULTS:
 The relationship between predicted nitrogen dioxide (NO2) levels and the percentage of the population below the poverty line was examined using linear regression. The model revealed a significant positive association between poverty and NO2 levels (Estimate = 0.143, p < 0.001), indicating that areas with higher poverty rates are associated with higher predicted NO2 concentrations. The model explained approximately 17.6% of the variance in predicted NO2 levels (Adjusted R-squared = 0.176). The intercept suggests a baseline NO2 level of 7.39 in areas with no population below the poverty line. These findings highlight a potential environmental justice concern, with higher NO2 levels disproportionately affecting lower-income communities.
 ```{r}
 colnames(newgrid_king_county)
-# Load necessary library
-library(tidyverse)
 
 # Load the dataset
 data <- newgrid_king_county
@@ -1093,11 +1233,6 @@ ggplot(data, aes(x = Percent_Below_Poverty, y = predicted_no2)) +
 
 #Map of Predicted NO2 and poverty
 ```{r}
-library(ggplot2)
-library(sf)
-library(dplyr)
-library(scales)
-
 # Normalize NO2 and Poverty levels to a 0–1 range
 newgrid_king_county <- newgrid_king_county %>%
   mutate(
@@ -1206,11 +1341,6 @@ ggplot(data, aes(x = Language_other_than_English, y = predicted_no2)) +
 This map visualizes the relationship between predicted nitrogen dioxide (NO₂) levels and language diversity in a specific geographic area, likely in Washington State, as it includes landmarks like Seattle and Tacoma. It is categorized into four distinct levels of NO₂ and language diversity
 
 ```{r}
-library(tidyverse)
-library(sf)
-library(ggspatial)
-library(scales)
-
 # Ensure columns are numeric and remove invalid values
 newgrid_king_county <- newgrid_king_county %>%
   mutate(
@@ -1292,9 +1422,6 @@ ggplot() +
 Narrative for write up: 
 A multiple linear regression model examined the relationship between predicted nitrogen dioxide (NO2) levels and race-related variables. Areas with higher proportions of Black/African American and "Two or More Races" residents were associated with increased NO2 levels, while areas with higher proportions of White, American Indian and Alaska Native (AIAN), and Asian residents had lower predicted NO2 levels. The category "Hawaiian/Pacific Islander" showed no significant association with NO2 levels. The findings highlight disparities in environmental exposures across racial groups, with potential implications for public health and environmental justice. Targeted interventions are needed to address elevated NO2 levels in disproportionately affected communities.
 ```{r}
-# Load necessary libraries
-library(tidyverse)
-
 # Load the dataset
 data <- newgrid_king_county
 
@@ -1369,11 +1496,7 @@ plot(model)
 
 Text for write up: This map visualizes the racial and ethnic composition of King County, Washington, by census tract, with an OpenStreetMap background for spatial context. Each panel represents the percentage distribution of a specific racial or ethnic group, including American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. The color gradient indicates the concentration, with darker shades representing higher percentages. This visual provides a detailed geographic understanding of demographic patterns across the county. Data sources include ACS and OpenStreetMap.
 ```{r}
-library(ggplot2)
-library(sf)
-library(dplyr)
-library(tidyr)
-library(ggspatial)  # For adding OpenStreetMap tiles
+# For adding OpenStreetMap tiles
 
 # Define the racial/ethnic variables and their readable names
 selected_race_vars <- c(
@@ -1451,10 +1574,7 @@ ggplot() +
 Text for write up: 
 This map displays the dominant racial or ethnic group by census tract in Snohomish, Pierce, and King County, Washington, overlaid on an OpenStreetMap basemap for geographic context. Each tract is color-coded to represent the racial or ethnic group with the highest proportion of residents. Groups represented include American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. This visualization highlights the spatial distribution of demographic dominance across the county, providing insights into the region's racial and ethnic diversity. Data sources include the American Community Survey (ACS), Mobile Monitoring, and OpenStreetMap.
 ```{r}
-library(ggplot2)
-library(sf)
-library(dplyr)
-library(ggspatial)  # For adding OpenStreetMap tiles
+# For adding OpenStreetMap tiles
 
 # Ensure CRS consistency for OpenStreetMap compatibility
 newgrid_king_county <- st_transform(newgrid_king_county, crs = 4326)
@@ -1530,11 +1650,7 @@ This map visualizes language use at home by census tract in Snohomish, Pierce, a
 The left panel highlights areas where English is predominantly spoken, with darker shades indicating higher percentages. The right panel illustrates areas where other languages dominate, showing significant linguistic diversity across the region. The color gradient reflects the proportion of households, from lower percentages in blue to higher percentages in yellow. This map provides insights into the spatial distribution of language use in the county. Data sources include the American Community Survey (ACS) and OpenStreetMap.
 
 ```{r}
-library(ggplot2)
-library(sf)
-library(dplyr)
-library(tidyr)
-library(ggspatial)  # For adding OpenStreetMap tiles
+# For adding OpenStreetMap tiles
 
 # Define the language variables and their readable names
 selected_language_vars <- c(
@@ -1599,7 +1715,7 @@ ggplot() +
 
 
 
-#Cross-Validation
+#Cross-Validation -- this is currently incorrect since it was using the wrong predictions.
 ```{r}
 # Ensure the data has a unique ID column
 no2_data <- stop_for_preds %>%
