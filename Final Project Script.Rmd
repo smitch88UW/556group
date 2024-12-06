@@ -306,6 +306,11 @@ stop_for_preds <- stop_w_acs %>% select(c(time, location, instrument_id, variabl
                                           log_m_to_a2, log_m_to_a3, log_m_to_coast,
                                           log_m_to_l_airp, log_m_to_comm, longitude, latitude))
 
+# filter stop_for_preds into two different data sets, one for PM2.5 and one for NO2
+pm_for_preds <- stop_for_preds %>% filter(variable == "neph_bscat")
+
+no2_for_preds <- stop_for_preds %>% filter(variable == "no2")
+
 # create grid data with ACS (for predicting onto and answering Q2/3)
 # should end with 5040 rows
  
@@ -558,6 +563,8 @@ stop_clean %>% group_by(variable) %>% summarise(N=n(),
                                                 min(mean_value),
                                                 median=median(median_value))
 
+# add in kable formatting
+
 ```
 
 ## Descriptive statistics for annual data
@@ -571,6 +578,8 @@ annual_clean %>% group_by(variable) %>% summarise(N=n(),
                                                 max=max(value),
                                                 min(value),
                                                 median=median(value))
+
+# add in kable formatting
 ```
 
 # Prediction model components
@@ -646,7 +655,7 @@ This code was taken from the Week 6 Lab, and we need to predict on the grid leve
 # We could consider checking for linearity for inclusion of additional variables from Mercer et al 2011
 
 # CODE TO EDIT FROM LAB 6: Plot to evaluate linearity between X and X
-ggplot(fall, aes(x = Pop_5000, y = ln_nox)) + 
+ggplot(stop_for_preds %>% filter(variable == "neph_bscat"), aes(x = pop10_s05000, y = log_)) + 
   geom_point() + 
   geom_smooth(method = "lm", se = FALSE) +
   geom_smooth() +
