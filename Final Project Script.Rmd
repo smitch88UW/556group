@@ -1,3 +1,4 @@
+
 ---
 title: "Final Project Script"
 output: 
@@ -626,7 +627,6 @@ m.uk <- fit.variogram(v.uk, vgm(c("Exp", "Sph", "Mat")))
 # Alternatively, you could fit the variogram with modified initial values. This still has convergence issues.
 # m.uk <- fit.variogram(v.uk, vgm("Exp", nugget = 0.01, psill = 0.03, range = 15000))
 
-
 # Display the selected variogram model parameters
 m.uk
 
@@ -646,9 +646,6 @@ ggplot(stop_w_acs, aes(x = (Percent_Below_Poverty), y = mean_value, fill = varia
 
 ```{r}
 #NOTE: This needs to be played with/cleaned up but it works
-# Load necessary libraries
-library(dplyr)
-
 # Clean the data by removing rows with NA or non-finite values in the variables used for modeling
 stop_w_acs_clean <- stop_w_acs %>%
   filter(
@@ -692,9 +689,7 @@ summary(no2_model)
 
 # Plot residuals vs. fitted values to check assumptions
 plot(pm25_model, which = 1, main = "Residuals vs Fitted")
-# Plot residuals vs. fitted values to check assumptions
-plot(no2_model, which = 1, main = "Residuals vs Fitted")
-
+plot(no2_model, which =1, main = "Residuals vs Fitted")
 ```
 
 ```{r}
@@ -724,8 +719,12 @@ grid_w_acs$predicted_pm25 <- predict(pm25_model, newdata = grid_w_acs)
 # Display the first few rows of the predictions
 head(grid_w_acs$predicted_pm25)
 
-# Predict NO2 concentrations
+# Predict PM2.5 concentrations
 grid_w_acs$predicted_no2 <- predict(no2_model, newdata = grid_w_acs)
+
+# Display the first few rows of the predictions
+head(grid_w_acs$predicted_no2)
+
 
 library(sf)
 # Assuming `grid_w_acs` has a column `tract_key`
@@ -737,10 +736,6 @@ newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
 ```
 
 ```{r}
-# Load necessary libraries
-library(ggplot2)
-library(sf)
-
 # Define the CRS (EPSG:32148 - Washington State Plane North, NAD83)
 lambert_crs <- st_crs(32148)
 
@@ -776,7 +771,7 @@ ggplot(newgrid_w_acs2_lambert) +
     legend.text = element_text(size = 10)
   )
 
-#Plot the predicted NO2 concentrations
+# Plot the predicted NO2 concentrations
 ggplot(newgrid_w_acs2_lambert) +
   geom_sf(aes(fill = predicted_no2), color = NA) +
   scale_fill_viridis_c(option = "plasma", name = "NO2 (ppb)") + # Color-blind-friendly palette
@@ -795,6 +790,7 @@ ggplot(newgrid_w_acs2_lambert) +
     legend.title = element_text(size = 12),
     legend.text = element_text(size = 10)
   )
+
 
 # percent below poverty map
 ggplot(newgrid_w_acs2_lambert) +
@@ -826,7 +822,7 @@ library(ggspatial)
 # Ensure the data is in EPSG:4326 (latitude/longitude)
 newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326)
 
-# Plot with OpenStreetMap basemap
+# Plot with OpenStreetMap basemap Predicted Pm2.5
 ggplot() +
   annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
   geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_pm25), color = NA, alpha = 0.8) +
@@ -845,7 +841,8 @@ ggplot() +
     legend.text = element_text(size = 10)
   )
 
-# Plot with OpenStreetMap basemap NO2
+
+# Plot with OpenStreetMap basemap Predicted NO2
 ggplot() +
   annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
   geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_no2), color = NA, alpha = 0.8) +
@@ -867,7 +864,7 @@ ggplot() +
 ```
 
 ```{r}
-# Plot with transparency
+# Plot with transparency PM2.5
 ggplot() +
   annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
   geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_pm25), color = NA, alpha = 0.06) +  # Adjust alpha for transparency
@@ -886,11 +883,11 @@ ggplot() +
     legend.text = element_text(size = 10)
   )
 
-#Plot NO2 with transparency
+# Plot with transparency NO2
 ggplot() +
   annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
   geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_no2), color = NA, alpha = 0.06) +  # Adjust alpha for transparency
-  scale_fill_viridis_c(option = "plasma", name = "NO2 (ppb)") +  # Color-blind-friendly palette
+  scale_fill_viridis_c(option = "plasma", name = "NO2(ppb)") +  # Color-blind-friendly palette
   labs(
     title = "Predicted NO2 Concentrations",
     subtitle = "Overlayed on OpenStreetMap Basemap with Transparency",
@@ -923,20 +920,32 @@ newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326)
 # Clip the predicted PM2.5 data to the boundary of King County 
 newgrid_king_county <- st_intersection(newgrid_w_acs2_latlong, king_county) 
 
-# Plot with OpenStreetMap basemap, focusing on King County, WA 
+# Plot with OpenStreetMap basemap, focusing on King County, WA for PM2.5
 
 ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
-  geom_sf(data = newgrid_king_county, aes(fill = predicted_pm25), color = NA, alpha = 0.8) + scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + labs( title = "Predicted PM2.5 Concentrations in Snohomish, King, and Pierce Counties, WA",
+  geom_sf(data = newgrid_king_county, aes(fill = predicted_pm25), color = NA, alpha = 0.8) + scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA",
  subtitle = "Overlayed on OpenStreetMap Basemap", x = "Longitude", y = "Latitude" ) + theme_minimal() + theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) ) 
 
 # Plot with transparency for better clarity 
 ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
   geom_sf(data = newgrid_king_county, aes(fill = predicted_pm25), color = NA, alpha = 0.06) + # Adjust alpha for transparency 
   scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + # Color-blind-friendly palette 
-  labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA", subtitle = "Overlayed on OpenStreetMap Basemap with Transparency", x = "Longitude", y = "Latitude" ) + theme_minimal() +               theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) )                                                                                                                                                  
-```
+  labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA", subtitle = "Overlayed on OpenStreetMap Basemap with Transparency", x = "Longitude", y = "Latitude" ) + theme_minimal() +               theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) )        
 
-Poverty and PM2.5 map
+# Plot with OpenStreetMap basemap, focusing on King County, WA for PM2.5
+
+ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
+  geom_sf(data = newgrid_king_county, aes(fill = predicted_no2), color = NA, alpha = 0.8) + scale_fill_viridis_c(option = "plasma", name = "NO2 (ppb)") + labs( title = "Predicted NO2 Concentrations in Greater King County, WA",
+ subtitle = "Overlayed on OpenStreetMap Basemap", x = "Longitude", y = "Latitude" ) + theme_minimal() + theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) ) 
+
+# Plot with transparency for better clarity 
+ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
+  geom_sf(data = newgrid_king_county, aes(fill = predicted_no2), color = NA, alpha = 0.06) + # Adjust alpha for transparency 
+  scale_fill_viridis_c(option = "plasma", name = "NO2(ppb)") + # Color-blind-friendly palette 
+  labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA", subtitle = "Overlayed on OpenStreetMap Basemap with Transparency", x = "Longitude", y = "Latitude" ) + theme_minimal() +               theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) )                  
+```
+#### Stephanie and Jorge's additions
+#Poverty and PM2.5 map
 ```{r, include=F}
 library(ggplot2)
 library(sf)
@@ -1007,4 +1016,146 @@ bivariate_colors_corrected <- c(
 # Filter and ensure CRS is consistent
 newgrid_king_county_filtered <- st_transform(newgrid_king_county, crs = 4326)
 
-# Plot with the corrected color scheme and appropriate transpare
+# Plot with the corrected color scheme and appropriate transparency
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap basemap
+  geom_sf(data = newgrid_king_county_filtered, aes(fill = bivar_category), color = NA, alpha = 0.8) +  # Increased transparency for subtle areas
+  scale_fill_manual(
+    values = bivariate_colors_corrected,
+    name = "PM2.5 & Poverty Levels",
+    labels = c(
+      "High PM2.5, High Poverty",
+      "High PM2.5, Low Poverty",
+      "Low PM2.5, High Poverty",
+      "Low PM2.5, Low Poverty")
+  ) +
+  labs(
+    title = "PM2.5 and Poverty Levels in King County, WA",
+    subtitle = "High PM2.5 and High Poverty areas are highlighted in dark red",
+    caption = "Data Sources: ACS, Mobile Monitoring, OpenStreetMap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = "right",  # Legend on the right-hand side
+    legend.box = "vertical",
+    panel.background = element_rect(fill = "transparent", color = NA)
+  )
+
+```
+#NO2 and poverty
+```{r}
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(scales)
+
+# Normalize NO2 and Poverty levels to a 0–1 range
+newgrid_king_county <- newgrid_king_county %>%
+  mutate(
+    no2_scaled = rescale(predicted_no2, to = c(0, 1)),  # Assuming `predicted_no2` is the column for NO2
+    poverty_scaled = rescale(Percent_Below_Poverty, to = c(0, 1)),
+    bivar_category = case_when(
+      no2_scaled <= 0.5 & poverty_scaled <= 0.5 ~ "low_low",
+      no2_scaled <= 0.5 & poverty_scaled > 0.5 ~ "low_high",
+      no2_scaled > 0.5 & poverty_scaled <= 0.5 ~ "high_low",
+      no2_scaled > 0.5 & poverty_scaled > 0.5 ~ "high_high"
+    )
+  )
+
+# Define a bivariate color palette
+bivariate_colors_no2 <- c(
+  "low_low" = "#f0f0f0",  # Low NO2, Low Poverty (light grey)
+  "low_high" = "#9ecae1",  # Low NO2, High Poverty (light blue)
+  "high_low" = "#fc9272",  # High NO2, Low Poverty (light red)
+  "high_high" = "#67000d"  # High NO2, High Poverty (dark red)
+)
+
+# Ensure CRS is consistent for mapping
+newgrid_king_county_filtered <- st_transform(newgrid_king_county, crs = 4326)
+
+# Plot the NO2 and Poverty map
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap basemap
+  geom_sf(data = newgrid_king_county_filtered, aes(fill = bivar_category), color = NA, alpha = 0.8) +
+  scale_fill_manual(
+    values = bivariate_colors_no2,
+    name = "NO2 & Poverty Levels",
+    labels = c(
+      "Low NO2, Low Poverty",
+      "Low NO2, High Poverty",
+      "High NO2, Low Poverty",
+      "High NO2, High Poverty"
+    )
+  ) +
+  labs(
+    title = "NO2 and Poverty Levels in King County, WA",
+    subtitle = "High NO2 and High Poverty areas are highlighted in dark red",
+    caption = "Data Sources: ACS, Mobile Monitoring, OpenStreetMap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = "right",  # Legend on the right-hand side
+    legend.box = "vertical",
+    panel.background = element_rect(fill = "transparent", color = NA)
+  )
+
+```
+
+
+
+
+#Cross-Validation
+```{r}
+# Ensure the data has a unique ID column
+no2_data <- stop_for_preds %>%
+  filter(variable == "no2") %>%
+  mutate(ID = row_number())  # Add a unique ID for each row
+
+# Define Functions
+get_MSE <- function(obs, pred) {
+  obs_avg <- mean(obs)
+  MSE_obs <- mean((obs - obs_avg)^2)
+  MSE_pred <- mean((obs - pred)^2)
+  c(RMSE = sqrt(MSE_pred), MSE_based_R2 = max(1 - MSE_pred / MSE_obs, 0))
+}
+
+do_CV <- function(data, id = "id", group = "group", formula) {
+  lapply(unique(data[[group]]), function(this_group) {
+    CV_lm <- lm(formula, data = data[data[[group]] != this_group, ])
+    data[data[[group]] == this_group, ] %>%
+      mutate(cvpreds = predict(CV_lm, newdata = .) %>% unname())
+  }) %>% bind_rows() %>% arrange(.data[[id]])
+}
+
+# Define formula for the model
+frml <- as.formula(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + pop10_s05000)
+
+# Create Random Cross-Validation Groups
+set.seed(123)
+no2_data <- no2_data %>%
+  mutate(CV_grp = sample(rep(1:10, length.out = n())))
+
+# Perform Cross-Validation
+cv_results <- do_CV(data = no2_data, id = "ID", group = "CV_grp", formula = frml)
+
+# Calculate RMSE and R2
+metrics <- get_MSE(no2_data$log_mean, cv_results$cvpreds)
+
+# Print Metrics
+print(metrics)
+
+```
