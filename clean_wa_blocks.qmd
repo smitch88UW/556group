@@ -1,0 +1,26 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+```{r read.data}
+wa_block_covar <- read_csv("wa_block10_covariates.csv")
+unique_tracts <- read_csv("unique_tracts.csv")
+```
+
+
+```{r get.vars.filter.tracts}
+unique_tracts <- unique_tracts %>% rename(tract_key = `unique(grid_covar_clean$tract_key)`)
+
+#filter on matching tracts, key variables
+wa_block_covar_clean <- wa_block_covar %>% filter(tract_key %in% unique_tracts$tract_key) %>% 
+  select(c(location_id, block_key, blockgroup_key, tract_key, m_to_a1, m_to_a2, m_to_a3, pop10_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000, latitude, longitude))
+
+```
+
+```{r write.csv}
+write_csv(wa_block_covar_clean, "wa_block_covar_clean.csv")
+```
+
+

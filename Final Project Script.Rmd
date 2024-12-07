@@ -55,7 +55,8 @@ pacman::p_load(
     downloader,                 # Downloading files over HTTP/HTTPS
     tigris,
     RColorBrewer,
-    scales
+    scales,
+    kableExtra
 )
 
 ```
@@ -83,8 +84,8 @@ acs_median_income <- read_csv("ACS19_median_income.csv")
 acs_poverty <- read_csv("ACS19_poverty.csv")
 
 ## we do not want this file -- these are predictions? We need the covariates
-unzip("filtered_census_block_predictions.csv.zip")
-census_block_centroids <- read_csv("filtered_census_block_predictions.csv")
+#unzip("filtered_census_block_predictions.csv.zip")
+#census_block_centroids <- read_csv("filtered_census_block_predictions.csv")
 
 census_blocks_covar <- read_csv("wa_block_covar_clean.csv")
 ```
@@ -238,7 +239,7 @@ acs_language_clean <- acs_language %>%
 #---------------------------------------------------------------
 ```
 
-```{data.cleaning.census.blocks}
+```{r data.cleaning.census.blocks}
 ###how I got the unique tracts for cleaning the wa blocks
 # unique_tracts <- as.data.frame(unique(grid_covar_clean$tract_key))
 # write_csv(unique_tracts, "unique_tracts.csv")
@@ -279,7 +280,9 @@ acs_simplified <- acs_combined %>%
     tract_key = as.numeric(substr(as.character(GEO_ID), 
                                   nchar(as.character(GEO_ID)) - 10, 
                                   nchar(as.character(GEO_ID))))
-  )
+  ) %>% #fixing incorrect Total_Pop for Pierce County tract 729.06
+  mutate(Total_Pop=case_when(NAME=="Census Tract 729.06, Pierce County, Washington" ~ 1995,
+                             .default=Total_Pop))
 
 #-----------------------# Data Dictionary for ACS Combined Dataset # 
 # GEO_ID : Unique identifier for the geographic area (e.g., census tract, block group) # NAME : Name of the geographic area (e.g., "Census Tract 1, County, State") # TRACTCE : Census tract code, uniquely identifying the geographic unit within a county # # Household Demographics: # White_Households : Number of households with a White population # Black_Households : Number of households with a Black or African American population # AIAN_Households : Number of households with an American Indian or Alaska Native (AIAN) population # Asian_Households : Number of households with an Asian population # Hawaiian_PI_Households : Number of households with a Native Hawaiian or Pacific Islander (Hawaiian_PI) population # Other_alone_Households : Number of households with people from other racial/ethnic groups (alone) # HispanicorLatino_Households : Number of households with a Hispanic or Latino population #
@@ -359,7 +362,7 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 # Descriptive statistics
 
-# Summary and visualizations of air pollutant data
+## Summary and visualizations of air pollutant data
 Comparing the distribution of the median values of NO2 and PM2.5 on the native and log scales. Based on these histograms, it looks like we should log transform both variables for subsequent analyses. 
 ```{r var.distributions}
 # NO2 plot on the native scale
@@ -472,39 +475,30 @@ print(faceted_histogram)
 ```
 
 ## Descriptive stats for census data
-```{r get.indiv.census.tract.levels}
-# group by tract key to get no2 and pm2.5
 
-```
+**Table 1** describes the demographic data for the study area by county. 
 
-CECILIA COME BACK TO THIS
+TO-DO: Add total row - use code from labs
+
 ```{r demographics.table}
 acs_simplified %>% 
-  summarise(White=White/Total_Pop*100,
-            Black_AfricanAmerican=Black_AfricanAmerican/Total_Pop*100,
-            AIAN=AIAN/Total_Pop,
-            Asian=Asian/Total_Pop,
-            Hawaiian_PacificIslander=Hawaiian_PacificIslander/Total_Pop,
-            HispanicorLatino=HispanicorLatino/Total_Pop,
-            Mean_PercentBelowPoverty=mean(Percent_Below_Poverty),
-            SD_PercentBelowPovery=sd(Percent_Below_Poverty)
-            )
-
-# Summarize demographics
-demographics <- acs_simplified %>%
-  select(White, Black_AfricanAmerican, AIAN, Asian, Hawaiian_PacificIslander, HispanicorLatino, Other_alone) %>%
-  summarise_all(sum, na.rm = TRUE) %>%
-  pivot_longer(cols = everything(), names_to = "Group", values_to = "Count") %>%
-  mutate(Percentage = Count / sum(Count) * 100)
-
-# Summarize income statistics
-percentbelowpoverty_stats <- acs_simplified %>%
-  summarise(
-    Mean_Percent_Below_Poverty = mean(Percent_Below_Poverty, na.rm = TRUE),
-    Median_Percent_Below_Poverty = median(Percent_Below_Poverty, na.rm = TRUE),
-    SD_Percent_Below_Poverty = sd(Percent_Below_Poverty, na.rm = TRUE)
-  )
-print(percentbelowpoverty_stats)#NOTE: this is the mean/median/sd percent of the pop that is below FPL
+  mutate(County=case_when(str_detect(NAME, "King") ~ "King County",
+                          str_detect(NAME, "Snohomish") ~ "Snohomish County",
+                          str_detect(NAME, "Pierce") ~ "Pierce County")) %>% group_by(County) %>%
+  summarise("Total Pop."=sum(Total_Pop),
+            White=mean(White/Total_Pop)*100,
+            "Black or African-American"=mean(Black_AfricanAmerican/Total_Pop)*100,
+            "American Indian or Alaska Native"=mean(AIAN/Total_Pop)*100,
+            Asian=mean(Asian/Total_Pop)*100,
+            "Hawaiian or Pacific Islander"=mean(Hawaiian_PacificIslander/Total_Pop)*100,
+            "Hispanic or Latino"=mean(HispanicorLatino/Total_Pop)*100,
+            "Percent Below Poverty"=mean(Percent_Below_Poverty),
+            "SD Percent Below Poverty"=sd(Percent_Below_Poverty),
+            "English only"=mean(English_only/Total_Pop)*100,
+            "Language other than English"=mean(Language_other_than_English/Total_Pop)*100,
+            "Spanish"=mean(Spanish/Total_Pop)*100,
+            "Other language"=mean(Other/Total_Pop)*100) %>% 
+  kable(caption="Table 1: Demographics by County for All Census Tracts included in study. All demographics are presented as percents besides total population.", digits=2) %>% kable_styling()
 
 # Summarize language usage
 language_usage <- acs_simplified %>%
@@ -517,72 +511,6 @@ language_usage <- acs_simplified %>%
   pivot_longer(cols = everything(), names_to = "Language", values_to = "Count") %>%
   mutate(Percentage = Count / sum(Count) * 100)
 print(language_usage)# NOTE: here is the summary stats for the languages
-```
-
-Delete below chunk? Does not make sense.
-
-```{r}
-#Visualization: Demographics, language, and poverty
-
-# Where are these Count values from? What is this?
-
-# plot
-demographics <- data.frame(
-  Group = c('White', 'Black_AfricanAmerican', 'AIAN', 'Asian', 
-            'Hawaiian_PacificIslander', 'HispanicorLatino', 'Other_alone'),
-  Count = c(5000, 3000, 1000, 2000, 500, 2500, 1000)
-) %>%
-  mutate(Percentage = Count / sum(Count) * 100, Type = 'Demographics (Percentage)')
-
-language_usage <- data.frame(
-  Language = c('English_only', 'Language_other_than_English', 'Spanish'),
-  Count = c(7000, 3000, 1500)
-) %>%
-  mutate(Percentage = Count / sum(Count) * 100, Type = 'Languages (Percentage)')
-
-percentbelowpoverty_stats <- data.frame(
-  Metric = c('Mean_Percent_Below_Poverty'),
-  Value = c(20), # Use a single value
-  Type = 'Income Below Federal Poverty Level'
-)
-
-# Combine datasets and rename categories
-dot_plot_data <- bind_rows(
-  demographics %>% select(Category = Group, Value = Percentage, Type),
-  language_usage %>% select(Category = Language, Value = Percentage, Type),
-  percentbelowpoverty_stats %>% rename(Category = Metric)
-) %>%
-  mutate(
-    Category = case_when(
-      Category == "Black_AfricanAmerican" ~ "Black or African American",
-      Category == "Hawaiian_PacificIslander" ~ "Hawaiian or Pacific Islander",
-      Category == "Language_other_than_English" ~ "Language Other Than English",
-      Category == "English_only" ~ "English Only",
-      Category == "HispanicorLatino" ~ "Hispanic or Latino",
-      Category == "AIAN" ~ "American Indian/Alaskan Native",
-      Category == "Other_alone" ~ "Other Race", # Correct label
-      TRUE ~ gsub("_", " ", Category) # Replace underscores with spaces
-    )
-  ) %>%
-  mutate(
-    Category = factor(
-      Category,
-      levels = c(
-        # Order: Demographics
-        "White", "Black or African American", "American Indian/Alaskan Native", "Asian",
-        "Hawaiian or Pacific Islander", "Hispanic or Latino", "Other Race",
-        # Order: Languages
-        "English Only", "Spanish", "Language Other Than English",
-        # Order: Income
-        "Mean Income"
-      )
-    )
-  )
-```
-
-```{r cohort.demographics table}
-## TO-DO
-
 ```
 
 ```{r, eval=FALSE}
@@ -656,14 +584,16 @@ ggplot(stop_w_acs_race_long, aes(x = Race, y = mean_value, fill = variable)) +
 
 ## Descriptive statistics for stop data
 
-This is super basic at the moment.
+This is super basic at the moment - could use some more work.
 ```{r desc.stats.stop.data}
 stop_clean %>% group_by(variable) %>% summarise(N=n(),
                                                 mean=mean(mean_value),
                                                 sd=sd(mean_value),
                                                 max=max(mean_value),
                                                 min(mean_value),
-                                                median=median(median_value))
+                                                median=median(median_value)) %>%
+  kable(caption="Table 2: Descriptive statistics for NO2 and PM2.5 for Study Area", digits=2) %>% 
+  kable_styling()
 
 # add in kable formatting
 
@@ -688,9 +618,8 @@ annual_clean %>% group_by(variable) %>% summarise(N=n(),
 
 ## Variograms
 
-After plotting these variograms, I am a little surprised by the lack of spatial structure there is here. I changed the cutoff to make it smaller, and this didn't show any difference. I then increased the cutoff, and it still doesn't show much spatial structure.
+These work best for the annual data, so we are using the annual data to make our predictions.
 
-TO-DO for the variograms -- add more of the code from Lab 6 to look at the cloud variograms and more.
 ```{r set.up.sf.data}
 
 latlong_proj <- 4326  
@@ -795,7 +724,7 @@ Note: log_mean ~ 1 is Ordinary Kriging -- since we are doing Universal Kriging w
 # ---- Empirical Variogram Plots ----
 
 # Variogram Cloud with stop_for_preds --> 24956646 observations
-vgm_no2_stop <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds %>% filter(variable == "no2"), cloud = TRUE)
+#vgm_no2_stop <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds %>% filter(variable == "no2"), cloud = TRUE)
 
 # Variogram Cloud with annual_for_preds --> 32135
 vgm_no2_annual <- variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds, annual_for_preds %>% filter(variable == "no2"), cloud = TRUE)
@@ -811,7 +740,7 @@ ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) +
   labs(x="Distance (meters)")
 
 # Binned Variogram with stop data --> ugly
-plot(variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds %>% filter(variable == "no2")))
+#plot(variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds %>% filter(variable == "no2")))
 
 # Binned Variogram with annual data --> prettier!
 plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")))
@@ -867,7 +796,7 @@ plot(v_annual, v_annual.fit)
 # 100000 is way too high a cutoff
 v_stop.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, data=(stop_for_preds %>% filter(variable=="no2")))
 
-v_annual.uk <- variogram(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, data=(annual_for_preds %>% filter(variable=="no2")))
+v_annual.uk <- variogram(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, data=annual_for_preds %>% filter(variable=="no2"))
 plot(v_stop.uk)
 plot(v_annual.uk)
 
@@ -943,9 +872,7 @@ pl4 <- plot(ln.no2.kr["se"], main = "UK Prediction Error NO2 (Standard Error)")
 
 Tried to let universal kriging on the stop data run for 30 min, but got nothing - let's chalk this up to limited computational power.
 
-```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE, eval=FALSE}
-### STILL NEED TO EDIT
-
+```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE}
 #transform stop data to Lambert for distances 
 blocks_for_preds <- st_as_sf(census_blocks_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
   # # convert to a meters CRS
@@ -974,7 +901,7 @@ pl4 <- plot(ln.NO2.block.kr["se"], main = "UK Prediction Error PM2.5 (Standard E
 #Generate variograms for pm25
 
 # Estimate the variogram with a covariate predictor
-v.uk.pm25 <- variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, data=(annual_for_preds %>% filter(variable=="neph_bscat")))
+v.uk.pm25 <- variogram(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, data=annual_for_preds %>% filter(variable=="pm2.5_ug_m3"))
                   #,cutoff=5000)
 
 plot(v.uk.pm25)
@@ -983,7 +910,7 @@ plot(v.uk.pm25)
 # note that this may have convergence issues. If so, you can try selecting one variogram model instead. You can also give it initial values for range, nugget etc. based on looking at the variogram cloud.
 
 # sometimes has convergence issues 
-m.uk.pm25 <- fit.variogram(v.uk, vgm(c("Exp", "Sph", "Mat")))
+m.uk.pm25 <- fit.variogram(v.uk.pm25, vgm(c("Exp", "Sph", "Mat")))
 
 # Alternatively, you could fit the variogram with modified initial values. This still has convergence issues.
 # m.uk <- fit.variogram(v.uk, vgm("Exp", nugget = 0.01, psill = 0.03, range = 15000))
@@ -995,24 +922,14 @@ m.uk.pm25
 plot(v.uk.pm25, model = m.uk.pm25)
 ```
 
-
-```{r universal.kriging.prediction.pm25.grid, warning=FALSE, eval=FALSE}
-### STILL NEED TO EDIT
-
-
-
-#transform stop data to Lambert for distances 
-grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
-  # # convert to a meters CRS
-  st_transform(lambert_proj)
-
+```{r universal.kriging.prediction.pm25.grid, warning=FALSE}
 # ---- Universal Kriging Prediction Code from Lab 6 ----
 
 # Fit the universal kriging model for PM2.5 and predict on the grid
-ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
-                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
+ln.PM25.kr <- krige(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="pm2.5_ug_m3"), # CRS in meters
                  newdata = grid_for_preds, # CRS in meters
-                 model = m.uk)
+                 model = m.uk.pm25)
 
 # Calculate standard errors to assess prediction uncertainty across locations
 ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
@@ -1025,22 +942,14 @@ pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)
 
 ```
 
-```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE, eval=FALSE}
-### STILL NEED TO EDIT
-
-
-#transform stop data to Lambert for distances 
-grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
-  # # convert to a meters CRS
-  st_transform(lambert_proj)
-
+```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE}
 # ---- Universal Kriging Prediction Code from Lab 6 ----
 
 # Fit the universal kriging model for PM2.5 and predict on the grid
-ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
-                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
-                 newdata = grid_for_preds, # CRS in meters
-                 model = m.uk)
+ln.PM25.kr <- krige(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="pm2.5_ug_m3"), # CRS in meters
+                 newdata = blocks_for_preds, # CRS in meters
+                 model = m.uk.pm25)
 
 # Calculate standard errors to assess prediction uncertainty across locations
 ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
@@ -1053,8 +962,188 @@ pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)
 
 ```
 
+## Cross-validation of NO2 and PM2.5 universal kriging models
 
-#Trying to answer questions
+```{r define CV functions}
+# ---- Define Cross-Validation Functions ----
+
+# Wrapper function krige.cv2() to retain the projection of the sf object.
+# This fixes a known bug in krige.cv() where projection information is lost.
+# (Bug reported and fixed on GitHub, but this wrapper may be required for now.)
+krige.cv2 <- function(formula, locations, model = NULL, ..., beta = NULL, 
+                      nmax = Inf, nmin = 0, maxdist = Inf, 
+                      nfold = nrow(locations),  # default is leave-one-out
+                      verbose = interactive(), 
+                      debug.level = 0) {
+  
+  # Perform cross-validation and retain projection if it's missing
+  krige.cv1 <- krige.cv(formula = formula, locations = locations, model = model, ..., 
+                        beta = beta, nmax = nmax, nmin = nmin, maxdist = maxdist, 
+                        nfold = nfold, verbose = verbose, debug.level = debug.level)
+  
+  # Set projection from input data if krige.cv output lacks it
+  if (is.na(st_crs(krige.cv1))) {
+    st_crs(krige.cv1) <- st_crs(locations)
+  }
+  return(krige.cv1)
+}
+
+# Function to create a bubble plot for kriging residuals
+krige.cv.bubble <- function(cv.out, plot_title) {
+  ggplot(data = cv.out) +
+    geom_sf(aes(size = abs(residual), color = factor(residual > 0)), alpha = 0.5) +
+    scale_color_discrete(name = 'Residual > 0', direction = -1) +
+    scale_size_continuous(name = '|Residual|') +
+    ggtitle(plot_title) +
+    theme_bw()
+}
+
+# Function to calculate performance metrics: RMSE and R²
+krige.cv.stats <- function(krige.cv.output, description) {
+  d <- krige.cv.output
+  
+  # Calculate Mean Squared Error (MSE) and R²
+  mean_observed <- mean(d$observed)
+  MSE_pred <- mean((d$observed - d$var1.pred)^2)
+  MSE_obs <- mean((d$observed - mean_observed)^2)
+  
+  # Create a summary table with rounded RMSE and MSE-based R²
+  tibble(
+    Description = description, 
+    RMSE = round(sqrt(MSE_pred), 4), 
+    MSE_based_R2 = round(max(1 - MSE_pred / MSE_obs, 0), 4)
+  )
+}
+
+```
+
+```{r cross-validation-no2, warning=FALSE}
+# ---- Cross-Validation for log(no2)----
+
+# Perform Universal Kriging (UK) with 5-fold Cross-Validation
+cv5uk_no2 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="no2"), 
+                 model = m_annual.uk,
+                 nfold = 5)
+
+# Perform Universal Kriging (UK) with Leave-One-Out Cross-Validation (LOOCV)
+cvLOOuk_no2 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="no2"), 
+                 model = m_annual.uk
+                     )
+
+# Calculate and compare performance statistics across cross-validation methods
+# Compile results into a summary table
+bind_rows(
+  krige.cv.stats(cv5uk_no2, "UK: 5-Fold CV NO2"),
+  krige.cv.stats(cvLOOuk_no2, "UK: LOO CV NO2")
+) %>% 
+  kable(caption = "Summary of Kriging Cross-Validation Results for log(NO2)") %>% kable_styling()
+
+```
+
+```{r cross-validation-pm25, warning=FALSE}
+# ---- Cross-Validation for log(PM2.5)----
+
+# Perform Universal Kriging (UK) with 5-fold Cross-Validation
+cv5uk_pm25 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="pm2.5_ug_m3"), 
+                 model = m.uk.pm25,
+                 nfold = 5)
+
+# Perform Universal Kriging (UK) with Leave-One-Out Cross-Validation (LOOCV)
+cvLOOuk_pm25 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="pm2.5_ug_m3"), 
+                 model = m.uk.pm25
+                     )
+
+# Calculate and compare performance statistics across cross-validation methods
+# Compile results into a summary table
+bind_rows(
+  krige.cv.stats(cv5uk_pm25, "UK: 5-Fold CV PM2.5"),
+  krige.cv.stats(cvLOOuk_pm25, "UK: LOO CV PM2.5")
+) %>% 
+  kable(caption = "Summary of Kriging Cross-Validation Results for log(PM2.5)") %>% kable_styling()
+
+```
+
+### Mapping predicted pollutants on native scale
+```{r map.native.scale}
+
+# exponentiate log vars
+ln.no2.kr$var1.pred.native <- exp(ln.no2.kr$var1.pred)
+ln.PM25.kr$var1.pred.native <- exp(ln.PM25.kr$var1.pred)
+
+# re-project back to long-lat proj
+blocks_for_preds <- st_transform(blocks_for_preds, latlong_proj)
+ln.no2.kr <- st_transform(ln.no2.kr, latlong_proj)
+ln.PM25.kr <- st_transform(ln.PM25.kr, latlong_proj)
+
+# check that coordinates are nearly identical
+all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.no2.kr))
+all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.PM25.kr))
+
+# Join LA grid to predictions; do so by nearest feature to avoid precision merging issues
+new_blocks_no2 <- st_join(blocks_for_preds, ln.no2.kr, join = st_nearest_feature) %>% 
+  rename(`NO2 (ppb)` = var1.pred.native, 
+         `ln(NO2) ln(ppb)`=var1.pred,
+         `ln(NO2) var`=var1.var,
+         `ln(NO2) se`=se)
+new_blocks_pm25 <- st_join(blocks_for_preds, ln.PM25.kr, join = st_nearest_feature) %>% 
+  rename(`PM2.5 (ug/m^3)` = var1.pred.native, 
+         `ln(PM2.5) ln(ug/m^3)`=var1.pred,
+         `ln(PM2.5) var`=var1.var,
+         `ln(PM2.5) se`=se)
+
+# Verify the join was successful (no NAs in predictions)
+all(!is.na(new_blocks_pm25$`ln(PM2.5) ln(ug/m^3)`)) 
+all(!is.na(new_blocks_no2$`ln(NO2) ln(ppb)`)) 
+#yay!
+```
+
+```{r plot.points}
+#NO2 - native scale
+ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) + 
+  theme_minimal() +
+  geom_sf(data = new_blocks_no2, aes(color = `NO2 (ppb)`), alpha = 0.05) +
+  # color friendly color scale
+  scale_color_viridis_c(option = "plasma") + 
+  ggtitle("Map of Seattle Area with UK NO2 Predictions Overlaid as Points") +
+  ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
+  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering)
+
+#PM2.5 - native scale
+ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) + 
+  theme_minimal() +
+  geom_sf(data = new_blocks_pm25, aes(color = `PM2.5 (ug/m^3)`), alpha = 0.05) +
+  # color friendly color scale
+  scale_color_viridis_c(option = "plasma") + 
+  ggtitle("Map of Seattle Area with UK PM2.5 Predictions Overlaid as Points") + ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
+  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering)
+```
+
+```{r merge.newblocks.acs}
+# had to average the predictions over each tract based on the predicted blocks
+predicted_to_tracts_no2 <- new_blocks_no2 %>% group_by(tract_key) %>%
+  summarise("ln(NO2) ln(ppb)"=mean(`ln(NO2) ln(ppb)`),
+            "ln(NO2) var" = mean(`ln(NO2) var`), "ln(NO2) se" = mean(`ln(NO2) se`),
+            "NO2 (ppb)" = mean(`NO2 (ppb)`))
+
+predicted_to_tracts_pm25 <- new_blocks_pm25 %>% group_by(tract_key) %>%
+  summarise("ln(PM2.5) ln(ug/m^3)"=mean(`ln(PM2.5) ln(ug/m^3)`),
+            "ln(PM2.5) var" = mean(`ln(PM2.5) var`), "ln(PM2.5) se" = mean(`ln(PM2.5) se`),
+            "PM2.5 (ug/m^3)" = mean(`PM2.5 (ug/m^3)`))
+
+full_data_w_preds <- acs_simplified %>% left_join(predicted_to_tracts_no2, join_by(tract_key==tract_key)) %>% left_join(predicted_to_tracts_pm25, join_by(tract_key==tract_key)) %>% select(-c(geometry.x, geometry.y)) %>% 
+  filter(!is.na(`ln(NO2) ln(ppb)`) | !is.na(`ln(PM2.5) ln(ug/m^3)`))
+```
+
+# Important note about the full data
+
+**IMPORTANT**: FULL DATA containing the predicted NO2, predicted PM2.5, and ACS variables is located in the dataframe called "full_data_w_preds". This is the dataframe we should use to do our association tests. If there are variables in other acs sets you can sub that in in the line of code above as long as they still have "tract_key" -- otherwise you'll need to do a little more.
+
+
+# Trying to answer questions
 
 Percent below poverty and pollutant concentrations are not linearly related, as evidenced by the below scatter plot.
 
@@ -1176,6 +1265,7 @@ Note: I likely broke this below because I commented out the incorrect prediction
 ```{r, eval=FALSE}
 # Define the CRS (EPSG:32148 - Washington State Plane North, NAD83)
 lambert_crs <- st_crs(32148)
+latlong_proj <- 4326
 
 # Reproject the spatial data to Lambert Conformal Conic
 #data_lambert <- st_transform(census_shapefile, crs = lambert_crs)
