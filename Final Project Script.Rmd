@@ -314,6 +314,17 @@ pm_for_preds <- stop_for_preds %>% filter(variable == "neph_bscat")
 
 no2_for_preds <- stop_for_preds %>% filter(variable == "no2")
 
+annual_w_acs <- left_join(annual_clean, mobile_covar_clean, join_by(location==native_id)) %>%
+  left_join(acs_simplified, join_by(tract_key==tract_key)) %>%
+  select(-c(GEO_ID))
+
+# created stop data for use in regression for prediction
+annual_for_preds <- annual_w_acs %>% select(c(location, variable,
+                                          value, pop10_s05000,
+                                          lu_industrial_p03000, log_m_to_a1, 
+                                          log_m_to_a2, log_m_to_a3, log_m_to_coast,
+                                          log_m_to_l_airp, log_m_to_comm, longitude, latitude))
+
 # create grid data with ACS (for predicting onto and answering Q2/3)
 # should end with 5040 rows
  
@@ -592,8 +603,9 @@ annual_clean %>% group_by(variable) %>% summarise(N=n(),
 After plotting these variograms, I am a little surprised by the lack of spatial structure there is here. I changed the cutoff to make it smaller, and this didn't show any difference. I then increased the cutoff, and it still doesn't show much spatial structure.
 
 TO-DO for the variograms -- add more of the code from Lab 6 to look at the cloud variograms and more.
-```{r generate.pm25.variogram}
-#Generate uk variograms for PM2.5
+```{r set.up.sf.data}
+
+latlong_proj <- 4326  
 
 lambert_proj <- "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=39 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs"
 
@@ -602,35 +614,204 @@ stop_for_preds <- st_as_sf(stop_for_preds, coords = c('longitude', 'latitude'), 
   # # convert to a meters CRS
   st_transform(lambert_proj)
 
+annual_for_preds <- st_as_sf(annual_for_preds, coords = c('longitude', 'latitude'), crs = 4326) %>%
+  # # convert to a meters CRS
+  st_transform(lambert_proj)
+
+# Convert grid to sf
+grid_covar_clean <- grid_covar_clean %>% 
+  st_as_sf(coords = c('longitude', 'latitude'), crs = latlong_proj)
+
+# Download the land polygon data as an sf multipolygon
+# the CRS for this is in lat/long degrees
+land <- ne_download(scale = "large", type = "land", category = "physical", returnclass = "sf")
+
+# Crop the land area to the bounding box of the LA grid to reduce processing time
+# have to convert the la_grid to the same degrees as LA
+land <- suppressWarnings(st_crop(land, st_bbox(grid_covar_clean))) 
+
+# Visualize cropped land area
+ggplot(land) + geom_sf()
+
+# Filter la_grid to keep only points that intersect with land
+grid_covar_clean <- grid_covar_clean[st_within(grid_covar_clean, land) %>% lengths() > 0,]
+
+# Visualize grid land locations (zoom in)
+ggplot(grid_covar_clean) + geom_sf(size=0.001)
+
+```
+
+```{r study.area.map.setup}
+# ---- Study Area Map Setup ----
+# Define a bounding box (min & max X and Y) with a 10,000m buffer around `grid_covar_clean`
+map_bbox <- grid_covar_clean %>%
+  # convert from degrees to meters
+  st_transform(crs = lambert_proj) %>%
+  # add a buffer around the area for visualization purposes
+  st_buffer(dist = 10000) %>%
+  # convert back to original CRS
+  st_transform(crs = latlong_proj) %>%
+  # take the min/max X/Y
+  st_bbox()
+
+map_bbox
+
+# Base map setup with ggplot2 and ggspatial using OSM tiles
+g <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) +
+  labs(title = "Study Area Grid with Map") +
+  theme_minimal()
+
+# Plot background map and the LA grid (zoom in)
+g + 
+  geom_sf(data = grid_covar_clean, size=0.001)
+
+# Add NO2 data with additional map elements
+g + 
+  geom_sf(data = stop_for_preds %>% filter(variable == "no2"), aes(color = mean_value)) + 
+  scale_color_viridis_c() + 
+  theme_void() +  
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1)
+  ) + 
+  ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +
+  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering) +  
+  labs(title = "Map of Study Area with the\nMobile Monitoring Data",
+       col="NO2 (ppb)"
+       )
+
+# Add PM2.5 data with additional map elements
+g + 
+  geom_sf(data = stop_for_preds %>% filter(variable == "neph_bscat"), aes(color = mean_value)) + 
+  scale_color_viridis_c() + 
+  theme_void() +  
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1)
+  ) + 
+  ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +
+  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering) +  
+  labs(title = "Map of Study Area with the\nMobile Monitoring Data",
+       col="PM2.5 (ug/m3)"
+       )
+```
+
+```{r}
+# Convert to a meter CRS for distance calculations
+stop_for_preds <- st_transform(stop_for_preds, crs = lambert_proj) 
+
+annual_for_preds <- st_transform(annual_for_preds, crs = lambert_proj) 
+```
+
+
+```{r no2.variograms}
+# ---- Empirical Variogram Plots ----
+
+# Variogram Cloud with stop_for_preds --> 24956646 observations
+vgm_no2_stop <- variogram(log_mean ~ 1, stop_for_preds %>% filter(variable == "no2"), cloud = TRUE)
+
+# Variogram Cloud with annual_for_preds --> 32135
+vgm_no2_annual <- variogram(value ~ 1, annual_for_preds %>% filter(variable == "no2"), cloud = TRUE)
+
+# RUNS FOREVER --> too many observations due to repeated measures?
+# ggplot(vgm_no2_stop, aes(x = dist, y=gamma)) + 
+#   geom_point(alpha=0.1) + 
+#   labs(x="Distance (meters)")
+
+# pretty
+ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) + 
+  geom_point(alpha=0.1) + 
+  labs(x="Distance (meters)")
+
+# Binned Variogram with stop data --> ugly
+plot(variogram(log_mean ~ 1, stop_for_preds %>% filter(variable == "no2")))
+
+# Binned Variogram with annual data --> prettier!
+plot(variogram(value ~ 1, annual_for_preds %>% filter(variable == "no2")))
+
+# Binned Variogram with Point Counts
+plot(variogram(value ~ 1, annual_for_preds %>% filter(variable == "no2")), pl = TRUE)
+
+# Smoothed Cloud Variogram using ggplot2
+ggplot(data = vgm_no2_annual, aes(x = dist, y = gamma)) +
+  geom_point(shape = 1, alpha = 0.6) +
+  geom_smooth(se = FALSE, color = "red", linetype = "solid",
+              # making span > 0.75 (default) makes this less wiggly so we can better see the general trend 
+              method = "loess", 
+              span = .8
+              ) +
+  labs(x = "Distance (meters)", 
+       y = "Semi-variance",
+       title = "Semi-variogram Cloud with Smoothed Curve") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+```{r}
+
+# Estimate the empirical variogram
+##  By default, the variogram() function limits the maximum lag distance. Increasing the cutoff parameter will allow it to calculate semivariance values over a larger distance, which might help the semivariogram level off if it's naturally reaching a sill
+v_stop <- variogram(log_mean ~ 1, data=stop_for_preds %>% filter(variable == "no2"))
+v_annual <- variogram(value ~ 1, data=annual_for_preds %>% filter(variable == "no2"))
+# as before:
+plot(v_stop)
+plot(v_annual)
+
+# Fit a model to the variogram, trying exponential, spherical, and Matern options
+v_stop.fit <- fit.variogram(v_stop, vgm(c("Exp", "Sph", "Mat")))
+v_annual.fit <- fit.variogram(v_annual, vgm(c("Exp", "Sph", "Mat")))
+
+
+# Display the selected variogram model and its parameters (sill, range, nugget)
+# Note: what model is selected? 
+v_stop.fit
+v_annual.fit
+
+# Plot the empirical variogram with the fitted model overlaid
+# consider expanding the x-axis here
+plot(v_stop, v_stop.fit)
+plot(v_annual, v_annual.fit)
+
+```
+
+```{r fitting variogram for universal kriging no2}
 # Estimate the variogram with a covariate predictor
-v.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="neph_bscat")),
+v_stop.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="no2")),
                   cutoff=100000)
 
-plot(v.uk)
+v_annual.uk <- variogram(value ~ pop10_s05000 + lu_industrial_p03000, data=(annual_for_preds %>% filter(variable=="no2")),
+                  cutoff=100000)
+plot(v_stop.uk)
+plot(v_annual.uk)
+
 
 # Fit the variogram model with multiple options (Exponential, Spherical, Matern)
 # note that this may have convergence issues. If so, you can try selecting one variogram model instead. You can also give it initial values for range, nugget etc. based on looking at the variogram cloud.
 
 # sometimes has convergence issues 
-m.uk <- fit.variogram(v.uk, vgm(c("Exp", "Sph", "Mat")))
+m_stop.uk <- fit.variogram(v_stop.uk, vgm(c("Exp", "Sph", "Mat")))
+m_annual.uk <- fit.variogram(v_annual.uk, vgm(c("Exp", "Sph", "Mat")))
 
 # Alternatively, you could fit the variogram with modified initial values. This still has convergence issues.
 # m.uk <- fit.variogram(v.uk, vgm("Exp", nugget = 0.01, psill = 0.03, range = 15000))
 
 
 # Display the selected variogram model parameters
-m.uk
+m_stop.uk
+m_annual.uk
 
 # Plot the empirical variogram with the fitted model
-plot(v.uk, model = m.uk)
+plot(v_stop.uk, model = m_stop.uk)
+plot(v_annual.uk, model = m_annual.uk)
+
 ```
 
 The variogram for NO2 is particularly mysterious when the cutoff is increased to 100,000... the semivariance gets lower with distance which is counter to what we have learned about how things are correlated in space... So I'm keeping the cutoff the default.
-```{r generate.no2.variogram}
-#Generate variograms for no2
+```{r generate.pm25.variogram}
+#Generate variograms for pm25
 
 # Estimate the variogram with a covariate predictor
-v.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="no2")))
+v.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="neph_bscat")))
                   #,cutoff=5000)
 
 plot(v.uk)
@@ -658,16 +839,23 @@ This code was taken from the Week 6 Lab, and we need to predict on the grid leve
 # We could consider checking for linearity for inclusion of additional variables from Mercer et al 2011
 
 # CODE TO EDIT FROM LAB 6: Plot to evaluate linearity between X and X
-ggplot(stop_for_preds %>% filter(variable == "neph_bscat"), aes(x = pop10_s05000, y = log_)) + 
+ggplot(stop_for_preds %>% filter(variable == "neph_bscat"), aes(x = pop10_s05000, y = log_mean)) + 
   geom_point() + 
   geom_smooth(method = "lm", se = FALSE) +
   geom_smooth() +
-  labs(x = "Population within 5000 meters", y = "Log-transformed NOx", 
-       title = "Relationship between Pop_5000 and ln_nox")
+  labs(x = "Population within 5000 meters", y = "Log-transformed PM2.5", 
+       title = "Relationship between Pop_5000 and log(PM2.5)")
+
+ggplot(stop_for_preds %>% filter(variable == "no2"), aes(x = pop10_s05000, y = log_mean)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth() +
+  labs(x = "Population within 5000 meters", y = "Log-transformed NO2", 
+       title = "Relationship between Pop_5000 and log(NO2)")
 
 ```
 
-```{r universal.kriging.prediction.pm25.grid, warning=FALSE}
+```{r universal.kriging.prediction.no2.grid, warning=FALSE}
 #transform stop data to Lambert for distances 
 grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
   # # convert to a meters CRS
@@ -675,20 +863,26 @@ grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude')
 
 # ---- Universal Kriging Prediction Code from Lab 6 ----
 
-# Fit the universal kriging model for PM2.5 and predict on the grid
-ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
-                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
+# Fit the universal kriging model for NO2 stop data and predict on the grid --> doesn't run
+# ln.no2.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+#                  stop_for_preds %>% filter(variable=="no2"), # CRS in meters
+#                  newdata = grid_for_preds, # CRS in meters
+#                  model = m_stop.uk)
+
+# Fit the universal kriging model for NO2 annual data and predict on the grid 
+ln.no2.kr <- krige(value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="no2"), # CRS in meters
                  newdata = grid_for_preds, # CRS in meters
-                 model = m.uk)
+                 model = m_annual.uk)
 
 # Calculate standard errors to assess prediction uncertainty across locations
-ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
+ln.no2.kr$se <- sqrt(ln.no2.kr$var1.var)  # Standard error is the square root of variance
 
-# Plot UK predictions
-pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5)")
+# Plot UK predictions --> nothing generating on the map
+pl3 <- plot(ln.no2.kr["var1.pred"], main = "UK Prediction of Log(NO2)")
 
-# Plot UK prediction standard errors
-pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)")
+# Plot UK prediction standard errors --> nothing generating on the map
+pl4 <- plot(ln.no2.kr["se"], main = "UK Prediction Error NO2 (Standard Error)")
 
 ```
 
@@ -721,7 +915,7 @@ pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)
 
 ```
 
-```{r universal.kriging.prediction.no2.grid, warning=FALSE}
+```{r universal.kriging.prediction.pm25.grid, warning=FALSE}
 ### STILL NEED TO EDIT
 
 
@@ -750,7 +944,7 @@ pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)
 
 ```
 
-```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE}
+```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE}
 ### STILL NEED TO EDIT
 
 
