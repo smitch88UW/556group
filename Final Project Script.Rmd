@@ -82,14 +82,18 @@ acs_median_income <- read_csv("ACS19_median_income.csv")
 
 acs_poverty <- read_csv("ACS19_poverty.csv")
 
+## we do not want this file -- these are predictions? We need the covariates
 unzip("filtered_census_block_predictions.csv.zip")
 census_block_centroids <- read_csv("filtered_census_block_predictions.csv")
+
+census_blocks_covar <- read_csv("wa_block_covar_clean.csv")
 ```
 
 # Clean data
 
 We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data and the annual data. We obtained Census shapefile data from the Census Bureau's website for Washington, and only kept those within King, Snohomish, Pierce, and Kitsap counties (*might not need Kitsap but I didn't want to open the map to check*). We linked data using the 6-digit tract code.
 
+Prior to log-transforming covariates, we added 1 to each variable.
 
 ```{r data.cleaning}
 # annual data
@@ -158,9 +162,10 @@ grid_covar_clean <- grid_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) %>%
   select(c(location_id, native_id, tract_key, m_to_a1, m_to_a2, m_to_a3, pop10_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000, longitude, latitude)) %>%
-  mutate(log_m_to_a1 = log(m_to_a1), log_m_to_a2=log(m_to_a2), log_m_to_a3=log(m_to_a3),
-         log_m_to_coast=log(m_to_coast), log_m_to_l_airp=log(m_to_l_airp), 
-         log_m_to_comm=log(m_to_comm)) %>% 
+  mutate(log_m_to_a1 = log(m_to_a1 + 1), log_m_to_a2=log(m_to_a2 +1),
+         log_m_to_a3=log(m_to_a3+1),
+         log_m_to_coast=log(m_to_coast+1), log_m_to_l_airp=log(m_to_l_airp+1), 
+         log_m_to_comm=log(m_to_comm+1)) %>% 
   select(-c(m_to_a1,m_to_a2,m_to_a3,m_to_coast,m_to_l_airp,m_to_comm))
 
 # mobile covar
@@ -170,9 +175,9 @@ mobile_covar_clean <- mobile_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) %>%
   select(c(location_id, native_id, tract_key, TRACTCE, m_to_a1, m_to_a2, m_to_a3, pop10_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000)) %>%
-  mutate(log_m_to_a1 = log(m_to_a1), log_m_to_a2=log(m_to_a2), log_m_to_a3=log(m_to_a3),
-         log_m_to_coast=log(m_to_coast), log_m_to_l_airp=log(m_to_l_airp), 
-         log_m_to_comm=log(m_to_comm)) %>% 
+  mutate(log_m_to_a1 = log(m_to_a1+1), log_m_to_a2=log(m_to_a2+1), log_m_to_a3=log(m_to_a3+1),
+         log_m_to_coast=log(m_to_coast+1), log_m_to_l_airp=log(m_to_l_airp+1), 
+         log_m_to_comm=log(m_to_comm+1)) %>% 
   select(-c(m_to_a1,m_to_a2,m_to_a3,m_to_coast,m_to_l_airp,m_to_comm))
 
 # create dataset with stop and mobile data combined
@@ -233,8 +238,23 @@ acs_language_clean <- acs_language %>%
 #---------------------------------------------------------------
 ```
 
+```{data.cleaning.census.blocks}
+###how I got the unique tracts for cleaning the wa blocks
+# unique_tracts <- as.data.frame(unique(grid_covar_clean$tract_key))
+# write_csv(unique_tracts, "unique_tracts.csv")
+
+# filter census block centroids so that it only contains centroids for the tracts in the grid
+
+census_blocks_covar_clean <- census_blocks_covar %>%
+  mutate(log_m_to_a1 = log(m_to_a1+1), log_m_to_a2=log(m_to_a2+1), log_m_to_a3=log(m_to_a3+1),
+         log_m_to_coast=log(m_to_coast+1), log_m_to_l_airp=log(m_to_l_airp+1), 
+         log_m_to_comm=log(m_to_comm+1)) %>% 
+  select(-c(m_to_a1,m_to_a2,m_to_a3,m_to_coast,m_to_l_airp,m_to_comm))
+
+```
+
 #ACS data merge: The goal with this merge is to create 1 CSV for us to work with all relevant ACS data for our project 
-```{r}
+```{r merge.acs.files}
 #--------------Steph & Jorge edits Nov 30
 # merge and clean language, race, ethnicity and poverty datasets
 # filter out the water census tracts, cleaned up NAs
@@ -289,7 +309,7 @@ Mercer et al vars + airp: D2A1, A1_50, A23_400, Pop_5000, D2C, Int_3000, D2Comm,
 What we included from grid and mobile covars: m_to_a1, m_to_a2, m_to_a3, pop_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000
 
 ACS vars
-```{r merge.data}
+```{r merge.stop.and.acs.data}
 # create stop data with land use vars and ACS (for descriptive tables)
 # merge locations on location var variable (stop_clean) and native_id variable (mobile_covar)
 # pre-merge stop_clean dim 17533 x 8, mobile_covar_clean dim 311 x 12
@@ -319,11 +339,11 @@ annual_w_acs <- left_join(annual_clean, mobile_covar_clean, join_by(location==na
   select(-c(GEO_ID))
 
 # created stop data for use in regression for prediction
-annual_for_preds <- annual_w_acs %>% select(c(location, variable,
-                                          value, pop10_s05000,
-                                          lu_industrial_p03000, log_m_to_a1, 
-                                          log_m_to_a2, log_m_to_a3, log_m_to_coast,
-                                          log_m_to_l_airp, log_m_to_comm, longitude, latitude))
+annual_for_preds <- annual_w_acs %>% 
+  mutate(log_value=log(value)) %>%
+  select(c(location, variable, log_value, value, pop10_s05000, lu_industrial_p03000,
+           log_m_to_a1, log_m_to_a2, log_m_to_a3, log_m_to_coast, log_m_to_l_airp,
+           log_m_to_comm, longitude, latitude))
 
 # create grid data with ACS (for predicting onto and answering Q2/3)
 # should end with 5040 rows
@@ -341,7 +361,7 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 # Summary and visualizations of air pollutant data
 Comparing the distribution of the median values of NO2 and PM2.5 on the native and log scales. Based on these histograms, it looks like we should log transform both variables for subsequent analyses. 
-```{r}
+```{r var.distributions}
 # NO2 plot on the native scale
 no2_native <- ggplot(data = no2_stop_clean, aes(median_value)) +
     geom_histogram(colour = "black", 
@@ -386,22 +406,90 @@ combined_data <- combined_data %>%
 faceted_histogram <- ggplot(data = combined_data, aes(value)) +
   geom_histogram(colour = "black", fill = "white", bins = 30) +
   facet_grid(pollutant ~ scale, scales = "free_x") +
-  labs(x = "Median Values", y = "Frequency", title="Distribution of Median Values") + 
+  labs(x = "Median Values", y = "Frequency", title="Distribution of Median Values",
+       caption="Distribution of native and log-transformed median values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
   theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5)) +
   theme(panel.grid.minor = element_blank()) 
 
 # Display the plot
 print(faceted_histogram)
 
+#---- Means in case we want means----
+no2_native <- ggplot(data = no2_stop_clean, aes(mean_value)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# NO2 plot on the log scale
+no2_log <- ggplot(data = no2_stop_clean, aes(log_mean)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# PM2.5 plot on the native scale
+pm25_native <- ggplot(data = pm25_stop_clean, aes(mean_value)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# PM2.5 plot on the log scale
+pm25_log <- ggplot(data = pm25_stop_clean, aes(log_mean)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# Add plot type and scale information to the datasets
+no2_native_data <- no2_stop_clean %>%
+  mutate(scale = "Native Scale", pollutant = "NO2", value = mean_value)
+
+no2_log_data <- no2_stop_clean %>%
+  mutate(scale = "Log Scale", pollutant = "NO2", value = log_mean)
+
+pm25_native_data <- pm25_stop_clean %>%
+  mutate(scale = "Native Scale", pollutant = "PM2.5", value = mean_value)
+
+pm25_log_data <- pm25_stop_clean %>%
+  mutate(scale = "Log Scale", pollutant = "PM2.5", value = log_mean)
+
+# Combine all datasets
+combined_data <- bind_rows(no2_native_data, no2_log_data, pm25_native_data, pm25_log_data)
+
+# Adjusting the scale levels to reorder the columns
+combined_data <- combined_data %>%
+  mutate(scale = factor(scale, levels = c("Native Scale", "Log Scale"))) 
+
+# Create faceted plot
+faceted_histogram <- ggplot(data = combined_data, aes(value)) +
+  geom_histogram(colour = "black", fill = "white", bins = 30) +
+  facet_grid(pollutant ~ scale, scales = "free_x") +
+  labs(x = "Mean Values", y = "Frequency", title="Distribution of Mean Values",
+       caption="Distribution of native and log-transformed mean values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5)) +
+  theme(panel.grid.minor = element_blank()) 
+
+# Display the plot
+print(faceted_histogram)
 ```
 
 ## Descriptive stats for census data
 ```{r get.indiv.census.tract.levels}
 # group by tract key to get no2 and pm2.5
-  
+
 ```
 
-```{r}
+CECILIA COME BACK TO THIS
+```{r demographics.table}
+acs_simplified %>% 
+  summarise(White=White/Total_Pop*100,
+            Black_AfricanAmerican=Black_AfricanAmerican/Total_Pop*100,
+            AIAN=AIAN/Total_Pop,
+            Asian=Asian/Total_Pop,
+            Hawaiian_PacificIslander=Hawaiian_PacificIslander/Total_Pop,
+            HispanicorLatino=HispanicorLatino/Total_Pop,
+            Mean_PercentBelowPoverty=mean(Percent_Below_Poverty),
+            SD_PercentBelowPovery=sd(Percent_Below_Poverty)
+            )
+
 # Summarize demographics
 demographics <- acs_simplified %>%
   select(White, Black_AfricanAmerican, AIAN, Asian, Hawaiian_PacificIslander, HispanicorLatino, Other_alone) %>%
@@ -702,20 +790,20 @@ stop_for_preds <- st_transform(stop_for_preds, crs = lambert_proj)
 annual_for_preds <- st_transform(annual_for_preds, crs = lambert_proj) 
 ```
 
-
+Note: log_mean ~ 1 is Ordinary Kriging -- since we are doing Universal Kriging we need to include our covariates in the formulas.
 ```{r no2.variograms}
 # ---- Empirical Variogram Plots ----
 
 # Variogram Cloud with stop_for_preds --> 24956646 observations
-vgm_no2_stop <- variogram(log_mean ~ 1, stop_for_preds %>% filter(variable == "no2"), cloud = TRUE)
+vgm_no2_stop <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds %>% filter(variable == "no2"), cloud = TRUE)
 
 # Variogram Cloud with annual_for_preds --> 32135
-vgm_no2_annual <- variogram(value ~ 1, annual_for_preds %>% filter(variable == "no2"), cloud = TRUE)
+vgm_no2_annual <- variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds, annual_for_preds %>% filter(variable == "no2"), cloud = TRUE)
 
 # RUNS FOREVER --> too many observations due to repeated measures?
 # ggplot(vgm_no2_stop, aes(x = dist, y=gamma)) + 
-#   geom_point(alpha=0.1) + 
-#   labs(x="Distance (meters)")
+#    geom_point(alpha=0.1) + 
+#    labs(x="Distance (meters)")
 
 # pretty
 ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) + 
@@ -723,13 +811,13 @@ ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) +
   labs(x="Distance (meters)")
 
 # Binned Variogram with stop data --> ugly
-plot(variogram(log_mean ~ 1, stop_for_preds %>% filter(variable == "no2")))
+plot(variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, stop_for_preds %>% filter(variable == "no2")))
 
 # Binned Variogram with annual data --> prettier!
-plot(variogram(value ~ 1, annual_for_preds %>% filter(variable == "no2")))
+plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")))
 
 # Binned Variogram with Point Counts
-plot(variogram(value ~ 1, annual_for_preds %>% filter(variable == "no2")), pl = TRUE)
+plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")), pl = TRUE)
 
 # Smoothed Cloud Variogram using ggplot2
 ggplot(data = vgm_no2_annual, aes(x = dist, y = gamma)) +
@@ -751,8 +839,8 @@ ggplot(data = vgm_no2_annual, aes(x = dist, y = gamma)) +
 
 # Estimate the empirical variogram
 ##  By default, the variogram() function limits the maximum lag distance. Increasing the cutoff parameter will allow it to calculate semivariance values over a larger distance, which might help the semivariogram level off if it's naturally reaching a sill
-v_stop <- variogram(log_mean ~ 1, data=stop_for_preds %>% filter(variable == "no2"))
-v_annual <- variogram(value ~ 1, data=annual_for_preds %>% filter(variable == "no2"))
+v_stop <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, data=stop_for_preds %>% filter(variable == "no2"))
+v_annual <- variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, data=annual_for_preds %>% filter(variable == "no2"))
 # as before:
 plot(v_stop)
 plot(v_annual)
@@ -763,7 +851,7 @@ v_annual.fit <- fit.variogram(v_annual, vgm(c("Exp", "Sph", "Mat")))
 
 
 # Display the selected variogram model and its parameters (sill, range, nugget)
-# Note: what model is selected? 
+# Note: what model is selected? Spherical for both
 v_stop.fit
 v_annual.fit
 
@@ -776,11 +864,10 @@ plot(v_annual, v_annual.fit)
 
 ```{r fitting variogram for universal kriging no2}
 # Estimate the variogram with a covariate predictor
-v_stop.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="no2")),
-                  cutoff=100000)
+# 100000 is way too high a cutoff
+v_stop.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, data=(stop_for_preds %>% filter(variable=="no2")))
 
-v_annual.uk <- variogram(value ~ pop10_s05000 + lu_industrial_p03000, data=(annual_for_preds %>% filter(variable=="no2")),
-                  cutoff=100000)
+v_annual.uk <- variogram(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, data=(annual_for_preds %>% filter(variable=="no2")))
 plot(v_stop.uk)
 plot(v_annual.uk)
 
@@ -806,32 +893,6 @@ plot(v_annual.uk, model = m_annual.uk)
 
 ```
 
-The variogram for NO2 is particularly mysterious when the cutoff is increased to 100,000... the semivariance gets lower with distance which is counter to what we have learned about how things are correlated in space... So I'm keeping the cutoff the default.
-```{r generate.pm25.variogram}
-#Generate variograms for pm25
-
-# Estimate the variogram with a covariate predictor
-v.uk <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000, data=(stop_for_preds %>% filter(variable=="neph_bscat")))
-                  #,cutoff=5000)
-
-plot(v.uk)
-
-# Fit the variogram model with multiple options (Exponential, Spherical, Matern)
-# note that this may have convergence issues. If so, you can try selecting one variogram model instead. You can also give it initial values for range, nugget etc. based on looking at the variogram cloud.
-
-# sometimes has convergence issues 
-m.uk <- fit.variogram(v.uk, vgm(c("Exp", "Sph", "Mat")))
-
-# Alternatively, you could fit the variogram with modified initial values. This still has convergence issues.
-# m.uk <- fit.variogram(v.uk, vgm("Exp", nugget = 0.01, psill = 0.03, range = 15000))
-
-# Display the selected variogram model parameters
-m.uk
-
-# Plot the empirical variogram with the fitted model
-plot(v.uk, model = m.uk)
-```
-
 ## Predict with Universal Kriging 
 This code was taken from the Week 6 Lab, and we need to predict on the grid level (for mapping) and the block level (for testing associations, as the grid can underpredict). We can try just mapping with the block level too.
 
@@ -855,7 +916,7 @@ ggplot(stop_for_preds %>% filter(variable == "no2"), aes(x = pop10_s05000, y = l
 
 ```
 
-```{r universal.kriging.prediction.no2.grid, warning=FALSE}
+```{r universal.kriging.prediction.no2.grid.annual, warning=FALSE}
 #transform stop data to Lambert for distances 
 grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
   # # convert to a meters CRS
@@ -863,14 +924,8 @@ grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude')
 
 # ---- Universal Kriging Prediction Code from Lab 6 ----
 
-# Fit the universal kriging model for NO2 stop data and predict on the grid --> doesn't run
-# ln.no2.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
-#                  stop_for_preds %>% filter(variable=="no2"), # CRS in meters
-#                  newdata = grid_for_preds, # CRS in meters
-#                  model = m_stop.uk)
-
 # Fit the universal kriging model for NO2 annual data and predict on the grid 
-ln.no2.kr <- krige(value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+ln.no2.kr <- krige(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
                  annual_for_preds %>% filter(variable=="no2"), # CRS in meters
                  newdata = grid_for_preds, # CRS in meters
                  model = m_annual.uk)
@@ -886,7 +941,62 @@ pl4 <- plot(ln.no2.kr["se"], main = "UK Prediction Error NO2 (Standard Error)")
 
 ```
 
-```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE}
+Tried to let universal kriging on the stop data run for 30 min, but got nothing - let's chalk this up to limited computational power.
+
+```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE, eval=FALSE}
+### STILL NEED TO EDIT
+
+#transform stop data to Lambert for distances 
+blocks_for_preds <- st_as_sf(census_blocks_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
+  # # convert to a meters CRS
+  st_transform(lambert_proj)
+
+# ---- Universal Kriging Prediction Code from Lab 6 ----
+
+# Fit the universal kriging model for PM2.5 and predict on the grid
+ln.NO2.block.kr <- krige(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+                 annual_for_preds %>% filter(variable=="no2"), # CRS in meters
+                 newdata = blocks_for_preds, # CRS in meters
+                 model = m_annual.uk)
+
+# Calculate standard errors to assess prediction uncertainty across locations
+ln.NO2.block.kr$se <- sqrt(ln.NO2.block.kr$var1.var)  # Standard error is the square root of variance
+
+# Plot UK predictions
+pl3 <- plot(ln.NO2.block.kr["var1.pred"], main = "UK Prediction of Log(PM2.5)")
+
+# Plot UK prediction standard errors
+pl4 <- plot(ln.NO2.block.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)")
+
+```
+
+```{r generate.pm25.variogram}
+#Generate variograms for pm25
+
+# Estimate the variogram with a covariate predictor
+v.uk.pm25 <- variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, data=(annual_for_preds %>% filter(variable=="neph_bscat")))
+                  #,cutoff=5000)
+
+plot(v.uk.pm25)
+
+# Fit the variogram model with multiple options (Exponential, Spherical, Matern)
+# note that this may have convergence issues. If so, you can try selecting one variogram model instead. You can also give it initial values for range, nugget etc. based on looking at the variogram cloud.
+
+# sometimes has convergence issues 
+m.uk.pm25 <- fit.variogram(v.uk, vgm(c("Exp", "Sph", "Mat")))
+
+# Alternatively, you could fit the variogram with modified initial values. This still has convergence issues.
+# m.uk <- fit.variogram(v.uk, vgm("Exp", nugget = 0.01, psill = 0.03, range = 15000))
+
+# Display the selected variogram model parameters
+m.uk.pm25
+
+# Plot the empirical variogram with the fitted model
+plot(v.uk.pm25, model = m.uk.pm25)
+```
+
+
+```{r universal.kriging.prediction.pm25.grid, warning=FALSE, eval=FALSE}
 ### STILL NEED TO EDIT
 
 
@@ -915,36 +1025,7 @@ pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)
 
 ```
 
-```{r universal.kriging.prediction.pm25.grid, warning=FALSE}
-### STILL NEED TO EDIT
-
-
-
-#transform stop data to Lambert for distances 
-grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
-  # # convert to a meters CRS
-  st_transform(lambert_proj)
-
-# ---- Universal Kriging Prediction Code from Lab 6 ----
-
-# Fit the universal kriging model for PM2.5 and predict on the grid
-ln.PM25.kr <- krige(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
-                 stop_for_preds %>% filter(variable=="neph_bscat"), # CRS in meters
-                 newdata = grid_for_preds, # CRS in meters
-                 model = m.uk)
-
-# Calculate standard errors to assess prediction uncertainty across locations
-ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root of variance
-
-# Plot UK predictions
-pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5)")
-
-# Plot UK prediction standard errors
-pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)")
-
-```
-
-```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE}
+```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE, eval=FALSE}
 ### STILL NEED TO EDIT
 
 
@@ -1092,7 +1173,7 @@ newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
 ```
 
 Note: I likely broke this below because I commented out the incorrect predictions (Cecilia).
-```{r}
+```{r, eval=FALSE}
 # Define the CRS (EPSG:32148 - Washington State Plane North, NAD83)
 lambert_crs <- st_crs(32148)
 
@@ -1170,7 +1251,7 @@ ggplot(newgrid_w_acs2_lambert) +
   )
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Ensure the data is in EPSG:4326 (latitude/longitude)
 newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326)
 
@@ -1215,7 +1296,7 @@ ggplot() +
 
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Plot with transparency PM2.5
 ggplot() +
   annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
@@ -1256,10 +1337,7 @@ ggplot() +
 
 ```
 
-```{r}
-library(tigris) # To get shapefiles for King County, WA
-library(sf) 
-library(ggspatial)
+```{r, eval=FALSE}
 
 # Load King County, WA shapefile 
 king_county <- counties(state = "WA", cb = TRUE) %>% filter(NAME == "King") 
@@ -1298,7 +1376,7 @@ ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level fo
 ```
 #### Stephanie and Jorge's additions
 #Poverty and PM2.5 map
-```{r, include=F}
+```{r, include=F, eval=F}
 # Normalize PM2.5 and Poverty levels to a 0–1 range
 newgrid_king_county <- newgrid_king_county %>%
   mutate(
@@ -1352,7 +1430,7 @@ ggplot() +
 ```
 
 #improved map: DO NOT DELETE THIS MAP
-```{r}
+```{r, eval=F}
 #Define the correct bivariate color palette
 bivariate_colors_corrected <- c(
   "low_low" = "#f0f0f0",  # Low PM2.5, Low Poverty (light grey, almost transparent)
@@ -1400,7 +1478,7 @@ ggplot() +
 #Linear regression Predicted NO2 and poverty
 RESULTS:
 The relationship between predicted nitrogen dioxide (NO2) levels and the percentage of the population below the poverty line was examined using linear regression. The model revealed a significant positive association between poverty and NO2 levels (Estimate = 0.143, p < 0.001), indicating that areas with higher poverty rates are associated with higher predicted NO2 concentrations. The model explained approximately 17.6% of the variance in predicted NO2 levels (Adjusted R-squared = 0.176). The intercept suggests a baseline NO2 level of 7.39 in areas with no population below the poverty line. These findings highlight a potential environmental justice concern, with higher NO2 levels disproportionately affecting lower-income communities.
-```{r}
+```{r, eval=FALSE}
 colnames(newgrid_king_county)
 
 # Load the dataset
@@ -1438,7 +1516,7 @@ ggplot(data, aes(x = Percent_Below_Poverty, y = predicted_no2)) +
 ```
 
 #Map of Predicted NO2 and poverty
-```{r}
+```{r, eval=FALSE}
 # Normalize NO2 and Poverty levels to a 0–1 range
 newgrid_king_county <- newgrid_king_county %>%
   mutate(
@@ -1504,9 +1582,7 @@ ggplot() +
 
 ```
 #Linear regression of predicted NO2 and language diversity
-```{r}
-# Load necessary library
-library(tidyverse)
+```{r, eval=FALSE}
 
 # Load the dataset
 data <- newgrid_king_county
@@ -1546,7 +1622,7 @@ ggplot(data, aes(x = Language_other_than_English, y = predicted_no2)) +
 
 This map visualizes the relationship between predicted nitrogen dioxide (NO₂) levels and language diversity in a specific geographic area, likely in Washington State, as it includes landmarks like Seattle and Tacoma. It is categorized into four distinct levels of NO₂ and language diversity
 
-```{r}
+```{r, eval=FALSE}
 # Ensure columns are numeric and remove invalid values
 newgrid_king_county <- newgrid_king_county %>%
   mutate(
@@ -1627,7 +1703,7 @@ ggplot() +
 
 Narrative for write up: 
 A multiple linear regression model examined the relationship between predicted nitrogen dioxide (NO2) levels and race-related variables. Areas with higher proportions of Black/African American and "Two or More Races" residents were associated with increased NO2 levels, while areas with higher proportions of White, American Indian and Alaska Native (AIAN), and Asian residents had lower predicted NO2 levels. The category "Hawaiian/Pacific Islander" showed no significant association with NO2 levels. The findings highlight disparities in environmental exposures across racial groups, with potential implications for public health and environmental justice. Targeted interventions are needed to address elevated NO2 levels in disproportionately affected communities.
-```{r}
+```{r, eval=FALSE}
 # Load the dataset
 data <- newgrid_king_county
 
@@ -1701,7 +1777,7 @@ plot(model)
 #Racial diversity - NOTE: size needs to be explored so maps are less squished
 
 Text for write up: This map visualizes the racial and ethnic composition of King County, Washington, by census tract, with an OpenStreetMap background for spatial context. Each panel represents the percentage distribution of a specific racial or ethnic group, including American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. The color gradient indicates the concentration, with darker shades representing higher percentages. This visual provides a detailed geographic understanding of demographic patterns across the county. Data sources include ACS and OpenStreetMap.
-```{r}
+```{r, eval=FALSE}
 # For adding OpenStreetMap tiles
 
 # Define the racial/ethnic variables and their readable names
@@ -1779,7 +1855,7 @@ ggplot() +
 #Racial map chloropleth
 Text for write up: 
 This map displays the dominant racial or ethnic group by census tract in Snohomish, Pierce, and King County, Washington, overlaid on an OpenStreetMap basemap for geographic context. Each tract is color-coded to represent the racial or ethnic group with the highest proportion of residents. Groups represented include American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. This visualization highlights the spatial distribution of demographic dominance across the county, providing insights into the region's racial and ethnic diversity. Data sources include the American Community Survey (ACS), Mobile Monitoring, and OpenStreetMap.
-```{r}
+```{r, eval=FALSE}
 # For adding OpenStreetMap tiles
 
 # Ensure CRS consistency for OpenStreetMap compatibility
@@ -1855,7 +1931,7 @@ This map visualizes language use at home by census tract in Snohomish, Pierce, a
 
 The left panel highlights areas where English is predominantly spoken, with darker shades indicating higher percentages. The right panel illustrates areas where other languages dominate, showing significant linguistic diversity across the region. The color gradient reflects the proportion of households, from lower percentages in blue to higher percentages in yellow. This map provides insights into the spatial distribution of language use in the county. Data sources include the American Community Survey (ACS) and OpenStreetMap.
 
-```{r}
+```{r, eval=FALSE}
 # For adding OpenStreetMap tiles
 
 # Define the language variables and their readable names
@@ -1922,7 +1998,7 @@ ggplot() +
 
 
 #Cross-Validation -- this is currently incorrect since it was using the wrong predictions.
-```{r}
+```{r, eval=FALSE}
 # Ensure the data has a unique ID column
 no2_data <- stop_for_preds %>%
   filter(variable == "no2") %>%
