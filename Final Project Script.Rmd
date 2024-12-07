@@ -81,6 +81,9 @@ acs_language <- read_csv("ACS19_language.csv")
 acs_median_income <- read_csv("ACS19_median_income.csv")
 
 acs_poverty <- read_csv("ACS19_poverty.csv")
+
+unzip("filtered_census_block_predictions.csv.zip")
+census_block_centroids <- read_csv("filtered_census_block_predictions.csv")
 ```
 
 # Clean data
