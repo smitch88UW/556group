@@ -693,7 +693,7 @@ g +
   ) + 
   ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +
   ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering) +  
-  labs(title = "Map of Study Area with the\nMobile Monitoring Data",
+  labs(title = "Map of Study Area with\n Annual Average\n NO2 concentrations",
        col="NO2 (ppb)"
        )
 
@@ -707,7 +707,7 @@ g +
   ) + 
   ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +
   ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering) +  
-  labs(title = "Map of Study Area with the\nMobile Monitoring Data",
+  labs(title = "Map of Study Area with\n Annual Average\n PM2.5 concentrations",
        col="PM2.5 (ug/m3)"
        )
 ```
@@ -1141,6 +1141,99 @@ full_data_w_preds <- acs_simplified %>% left_join(predicted_to_tracts_no2, join_
 # Important note about the full data
 
 **IMPORTANT**: FULL DATA containing the predicted NO2, predicted PM2.5, and ACS variables is located in the dataframe called "full_data_w_preds". This is the dataframe we should use to do our association tests. If there are variables in other acs sets you can sub that in in the line of code above as long as they still have "tract_key" -- otherwise you'll need to do a little more.
+
+# Research Question 3: Association between Pollutant Concentrations & Demographics
+
+```{r}
+# Regression between annual PM2.5 concentrations and various demographics
+
+#PM2.5 x poverty
+pm_poverty <- lm(Percent_Below_Poverty ~ `PM2.5 (ug/m^3)`, 
+                 data = full_data_w_preds)
+
+# Created new columns for percent of population for each race (same as those included in demographic statistics summary table (except for "Other Langugage"))
+
+full_data_w_preds_perc <- full_data_w_preds %>% 
+    mutate(
+           p_White = (White / Total_Pop)*100,
+           p_BlackAA = (Black_AfricanAmerican/ Total_Pop)*100,
+           p_AIAN = (AIAN / Total_Pop)*100,
+           p_Asian = (Asian / Total_Pop)*100,
+           p_HPI = (Hawaiian_PacificIslander / Total_Pop)*100,
+           p_Hispanic = (Hawaiian_PacificIslander / Total_Pop)*100,
+           p_engl_only = (English_only / Total_Pop)*100,
+           p_lang_other = (Language_other_than_English / Total_Pop)*100,
+           p_spanish = (Spanish / Total_Pop)*100
+           )
+           
+# PM2.5 x White
+pm_white <- lm(p_White ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+pm_BlackAA <- lm(p_BlackAA ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+pm_AIAN <- lm(p_AIAN ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+pm_Asian <- lm(p_Asian ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+pm_HPI <- lm(p_HPI ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+pm_Hispanic <- lm(p_Hispanic ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+pm_engl_only <- lm(p_engl_only ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+pm_lang_other <- lm(p_lang_other ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+pm_spanish <- lm(p_spanish ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
+
+
+# Summary of associations between PM2.5 and demographics
+
+
+```
+
+```{r}
+# Associations between annual NO2 concentrations and various demographics
+
+# NO2 x poverty
+no2_poverty <- lm(Percent_Below_Poverty ~ `NO2 (ppb)`, 
+                 data = full_data_w_preds)
+           
+# PM2.5 x White
+no2_white <- lm(p_White ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+no2_BlackAA <- lm(p_BlackAA ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+no2_AIAN <- lm(p_AIAN ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+no2_Asian <- lm(p_Asian ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+no2_HPI <- lm(p_HPI ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+no2_Hispanic <- lm(p_Hispanic ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+# PM2.5 x Black African American
+no2_engl_only <- lm(p_engl_only ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+no2_lang_other <- lm(p_lang_other ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+no2_spanish <- lm(p_spanish ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
+
+
+# Summary of associations between PM2.5 and demographics
+
+
+```
 
 
 # Trying to answer questions
