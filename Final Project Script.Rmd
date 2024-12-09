@@ -37,6 +37,8 @@ if (!require("rnaturalearthhires")) {
 pacman::p_load(
     tidyverse,                 # Data manipulation and visualization
     # takes a while to install on SPH
+    biscale,
+    broom,
     ggspatial,                 # Geospatial extensions for ggplot.  
     maptiles, # maptiles and tmap libraries can be used instead of or in combination with ggplot + ggspatial. maptiles offers more tile-based map flexibility; ggspatial provides the ability to annotate maps easily; tmap offers both static and interactive maps that we won't review in this course. 
     terra, # alternative mapping with raster files
@@ -362,117 +364,6 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 # Descriptive statistics
 
-## Summary and visualizations of air pollutant data
-Comparing the distribution of the median values of NO2 and PM2.5 on the native and log scales. Based on these histograms, it looks like we should log transform both variables for subsequent analyses. 
-```{r var.distributions}
-# NO2 plot on the native scale
-no2_native <- ggplot(data = no2_stop_clean, aes(median_value)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# NO2 plot on the log scale
-no2_log <- ggplot(data = no2_stop_clean, aes(log_median)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# PM2.5 plot on the native scale
-pm25_native <- ggplot(data = pm25_stop_clean, aes(median_value)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# PM2.5 plot on the log scale
-pm25_log <- ggplot(data = pm25_stop_clean, aes(log_median)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# Add plot type and scale information to the datasets
-no2_native_data <- no2_stop_clean %>%
-  mutate(scale = "Native Scale", pollutant = "NO2", value = median_value)
-
-no2_log_data <- no2_stop_clean %>%
-  mutate(scale = "Log Scale", pollutant = "NO2", value = log_median)
-
-pm25_native_data <- pm25_stop_clean %>%
-  mutate(scale = "Native Scale", pollutant = "PM2.5", value = median_value)
-
-pm25_log_data <- pm25_stop_clean %>%
-  mutate(scale = "Log Scale", pollutant = "PM2.5", value = log_median)
-
-# Combine all datasets
-combined_data <- bind_rows(no2_native_data, no2_log_data, pm25_native_data, pm25_log_data)
-
-# Adjusting the scale levels to reorder the columns
-combined_data <- combined_data %>%
-  mutate(scale = factor(scale, levels = c("Native Scale", "Log Scale"))) 
-
-# Create faceted plot
-faceted_histogram <- ggplot(data = combined_data, aes(value)) +
-  geom_histogram(colour = "black", fill = "white", bins = 30) +
-  facet_grid(pollutant ~ scale, scales = "free_x") +
-  labs(x = "Median Values", y = "Frequency", title="Distribution of Median Values",
-       caption="Distribution of native and log-transformed median values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.caption = element_text(hjust = 0.5)) +
-  theme(panel.grid.minor = element_blank()) 
-
-# Display the plot
-print(faceted_histogram)
-
-#---- Means in case we want means----
-no2_native <- ggplot(data = no2_stop_clean, aes(mean_value)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# NO2 plot on the log scale
-no2_log <- ggplot(data = no2_stop_clean, aes(log_mean)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# PM2.5 plot on the native scale
-pm25_native <- ggplot(data = pm25_stop_clean, aes(mean_value)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# PM2.5 plot on the log scale
-pm25_log <- ggplot(data = pm25_stop_clean, aes(log_mean)) +
-    geom_histogram(colour = "black", 
-                   fill = "white") 
-
-# Add plot type and scale information to the datasets
-no2_native_data <- no2_stop_clean %>%
-  mutate(scale = "Native Scale", pollutant = "NO2", value = mean_value)
-
-no2_log_data <- no2_stop_clean %>%
-  mutate(scale = "Log Scale", pollutant = "NO2", value = log_mean)
-
-pm25_native_data <- pm25_stop_clean %>%
-  mutate(scale = "Native Scale", pollutant = "PM2.5", value = mean_value)
-
-pm25_log_data <- pm25_stop_clean %>%
-  mutate(scale = "Log Scale", pollutant = "PM2.5", value = log_mean)
-
-# Combine all datasets
-combined_data <- bind_rows(no2_native_data, no2_log_data, pm25_native_data, pm25_log_data)
-
-# Adjusting the scale levels to reorder the columns
-combined_data <- combined_data %>%
-  mutate(scale = factor(scale, levels = c("Native Scale", "Log Scale"))) 
-
-# Create faceted plot
-faceted_histogram <- ggplot(data = combined_data, aes(value)) +
-  geom_histogram(colour = "black", fill = "white", bins = 30) +
-  facet_grid(pollutant ~ scale, scales = "free_x") +
-  labs(x = "Mean Values", y = "Frequency", title="Distribution of Mean Values",
-       caption="Distribution of native and log-transformed mean values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.caption = element_text(hjust = 0.5)) +
-  theme(panel.grid.minor = element_blank()) 
-
-# Display the plot
-print(faceted_histogram)
-```
 
 ## Descriptive stats for census data
 
@@ -481,27 +372,90 @@ print(faceted_histogram)
 TO-DO: Add total row - use code from labs
 
 ```{r demographics.table}
-acs_simplified %>% 
-  mutate(County=case_when(str_detect(NAME, "King") ~ "King County",
-                          str_detect(NAME, "Snohomish") ~ "Snohomish County",
-                          str_detect(NAME, "Pierce") ~ "Pierce County")) %>% group_by(County) %>%
-  summarise("Total Pop."=sum(Total_Pop),
-            White=mean(White/Total_Pop)*100,
-            "Black or African-American"=mean(Black_AfricanAmerican/Total_Pop)*100,
-            "American Indian or Alaska Native"=mean(AIAN/Total_Pop)*100,
-            Asian=mean(Asian/Total_Pop)*100,
-            "Hawaiian or Pacific Islander"=mean(Hawaiian_PacificIslander/Total_Pop)*100,
-            "Hispanic or Latino"=mean(HispanicorLatino/Total_Pop)*100,
-            "Percent Below Poverty"=mean(Percent_Below_Poverty),
-            "SD Percent Below Poverty"=sd(Percent_Below_Poverty),
-            "English only"=mean(English_only/Total_Pop)*100,
-            "Language other than English"=mean(Language_other_than_English/Total_Pop)*100,
-            "Spanish"=mean(Spanish/Total_Pop)*100,
-            "Other language"=mean(Other/Total_Pop)*100) %>% 
-  kable(caption="Table 1: Demographics by County for All Census Tracts included in study. All demographics are presented as percents besides total population.", digits=2) %>% kable_styling()
+# Commenting out this code bc of updated code below that includes a Total row. -kt
+
+# acs_simplified %>% 
+#   filter(tract_key %in% unique(stop_w_acs$tract_key)) %>% 
+#   mutate(County=case_when(str_detect(NAME, "King") ~ "King County",
+#                           str_detect(NAME, "Snohomish") ~ "Snohomish County",
+#                           str_detect(NAME, "Pierce") ~ "Pierce County")) %>% group_by(County) %>%
+#   summarise("Total Pop."=sum(Total_Pop),
+#             White=mean(White/Total_Pop)*100,
+#             "Black or African-American"=mean(Black_AfricanAmerican/Total_Pop)*100,
+#             "American Indian or Alaska Native"=mean(AIAN/Total_Pop)*100,
+#             Asian=mean(Asian/Total_Pop)*100,
+#             "Hawaiian or Pacific Islander"=mean(Hawaiian_PacificIslander/Total_Pop)*100,
+#             "Hispanic or Latino"=mean(HispanicorLatino/Total_Pop)*100,
+#             "Percent Below Poverty"=mean(Percent_Below_Poverty),
+#             "SD Percent Below Poverty"=sd(Percent_Below_Poverty),
+#             "English only"=mean(English_only/Total_Pop)*100,
+#             "Language other than English"=mean(Language_other_than_English/Total_Pop)*100,
+#             "Spanish"=mean(Spanish/Total_Pop)*100,
+#             "Other language"=mean(Other/Total_Pop)*100) %>% 
+#   kable(caption="Table 1: Demographics by County for All Census Tracts included in study. All demographics are presented as percents besides total population.", digits=2) %>% kable_styling()
+
+
+# County-level summary
+county_summary <- acs_simplified %>% 
+  filter(tract_key %in% unique(stop_w_acs$tract_key)) %>% 
+  mutate(County = case_when(
+    str_detect(NAME, "King") ~ "King County",
+    str_detect(NAME, "Snohomish") ~ "Snohomish County",
+    str_detect(NAME, "Pierce") ~ "Pierce County"
+  )) %>% 
+  group_by(County) %>%
+  summarise(
+    `Total Pop. (N)` = sum(Total_Pop),
+    White = mean(White / Total_Pop) * 100,
+    `Black or African-American` = mean(Black_AfricanAmerican / Total_Pop) * 100,
+    `American Indian or Alaska Native` = mean(AIAN / Total_Pop) * 100,
+    Asian = mean(Asian / Total_Pop) * 100,
+    `Hawaiian or Pacific Islander` = mean(Hawaiian_PacificIslander / Total_Pop) * 100,
+    `Hispanic or Latino` = mean(HispanicorLatino / Total_Pop) * 100,
+    `Percent Below Poverty` = mean(Percent_Below_Poverty),
+    `SD Percent Below Poverty` = sd(Percent_Below_Poverty),
+    `English only` = mean(English_only / Total_Pop) * 100,
+    `Language other than English` = mean(Language_other_than_English / Total_Pop) * 100,
+    Spanish = mean(Spanish / Total_Pop) * 100,
+    `Other language` = mean(Other / Total_Pop) * 100
+  )
+
+# Total row calculation
+total_row <- acs_simplified %>%
+  filter(tract_key %in% unique(stop_w_acs$tract_key)) %>%
+  summarise(
+    County = "Total",
+    `Total Pop. (N)` = sum(Total_Pop),
+    White = mean(White / Total_Pop) * 100,
+    `Black or African-American` = mean(Black_AfricanAmerican / Total_Pop) * 100,
+    `American Indian or Alaska Native` = mean(AIAN / Total_Pop) * 100,
+    Asian = mean(Asian / Total_Pop) * 100,
+    `Hawaiian or Pacific Islander` = mean(Hawaiian_PacificIslander / Total_Pop) * 100,
+    `Hispanic or Latino` = mean(HispanicorLatino / Total_Pop) * 100,
+    `Percent Below Poverty` = mean(Percent_Below_Poverty),
+    `SD Percent Below Poverty` = NA, # SD is not meaningful across aggregated data
+    `English only` = mean(English_only / Total_Pop) * 100,
+    `Language other than English` = mean(Language_other_than_English / Total_Pop) * 100,
+    Spanish = mean(Spanish / Total_Pop) * 100,
+    `Other language` = mean(Other / Total_Pop) * 100
+  )
+
+# Combine county summaries with the total row
+table1 <- bind_rows(county_summary, total_row)
+
+# Generate table
+table1 %>% 
+  kable(
+    caption = "Table 1: Demographics by County for All Census Tracts included in study. All demographics are presented as percents besides total population.",
+    digits = 2
+  ) %>%
+  kable_styling()
+
 
 # Summarize language usage
+# do we still need this code? Aren't these values summarized in Table 1 above? -kt
 language_usage <- acs_simplified %>%
+  filter(tract_key %in% unique(stop_w_acs$tract_key)) %>%
   summarise(
     English_only = sum(English_only, na.rm = TRUE),
     Language_other_than_English = sum(Language_other_than_English, na.rm = TRUE),
@@ -584,18 +538,74 @@ ggplot(stop_w_acs_race_long, aes(x = Race, y = mean_value, fill = variable)) +
 
 ## Descriptive statistics for stop data
 
-This is super basic at the moment - could use some more work.
 ```{r desc.stats.stop.data}
-stop_clean %>% group_by(variable) %>% summarise(N=n(),
-                                                mean=mean(mean_value),
-                                                sd=sd(mean_value),
-                                                max=max(mean_value),
-                                                min(mean_value),
-                                                median=median(median_value)) %>%
-  kable(caption="Table 2: Descriptive statistics for NO2 and PM2.5 for Study Area", digits=2) %>% 
+# stop_clean %>% group_by(variable) %>% summarise(N=n(),
+#                                                 mean=mean(mean_value),
+#                                                 sd=sd(mean_value),
+#                                                 max=max(mean_value),
+#                                                 min(mean_value),
+#                                                 median=median(median_value)) %>%
+#   kable(caption="Table 2: Descriptive statistics for NO2 and PM2.5 for Study Area", digits=2) %>% 
+#   kable_styling()
+
+stop_clean %>% 
+  mutate(variable = case_when(
+    variable == "neph_bscat" ~ "PM2.5 (ug/m3)",
+    variable == "no2" ~ "NO2 (ppb)",
+    TRUE ~ variable
+  )) %>%
+  group_by(variable) %>% 
+  summarise(
+    N = n(),
+    "Arithmetic Mean" = mean(mean_value),
+    "SD" = sd(mean_value),
+    "Geometric Mean" = exp(mean(log(mean_value), na.rm = TRUE)),
+    "Geometric SD" = exp(sd(log(mean_value), na.rm = TRUE)),
+    Max = max(mean_value),
+    Min = min(mean_value),
+    Median = median(median_value)
+  ) %>%
+  rename(Pollutant = variable) %>% 
+  kable(caption = "Table 2: Descriptive statistics for NO2 and PM2.5 for Study Area", digits = 2) %>% 
   kable_styling()
 
-# add in kable formatting
+# I tried incorporating log-transformed values as well, but I think this may be unnecessary if we present the geo mean and SD in the above table. Plus, we can follow up Table 2 with Figure 1 of the distributions to visualize the need for log-transformation. -kt
+
+# table1 <- stop_clean %>% 
+#   mutate(
+#     variable = case_when(
+#       variable == "neph_bscat" ~ "PM2.5 (ug/m3)",
+#       variable == "no2" ~ "NO2 (ppb)",
+#       TRUE ~ variable
+#     ),
+#     log_variable = paste0("log(", variable, ")"),
+#     log_value = log(mean_value) 
+#   ) %>%
+#   pivot_longer(
+#     cols = c(mean_value, log_value),
+#     names_to = "value_type",
+#     values_to = "value"
+#   ) %>%
+#   mutate(
+#     variable_type = case_when(
+#       value_type == "mean_value" ~ variable,
+#       value_type == "log_value" ~ log_variable
+#     )
+#   ) %>%
+#   group_by(variable_type) %>% 
+#   summarise(
+#     N = n(),
+#     Mean = mean(value, na.rm = TRUE),
+#     SD = sd(value, na.rm = TRUE),
+#     Max = max(value, na.rm = TRUE),
+#     Min = min(value, na.rm = TRUE),
+#     Median = median(value, na.rm = TRUE)
+#   ) %>%
+#   rename(Pollutant = variable_type) %>% 
+#   kable(caption = "Table 2: Descriptive statistics for NO2, PM2.5, and their log-transformed values", digits = 2) %>% 
+#   kable_styling()
+# 
+# table1
 
 ```
 
@@ -603,16 +613,147 @@ stop_clean %>% group_by(variable) %>% summarise(N=n(),
 
 Also very basic at the moment.
 ```{r desc.stats.annual.data}
-# edited this code to reflect the correct numeric variable ("value") in the dataset, which only has annual predictions for no2, so I don't think we'll want to summarize this data -kt
-annual_clean %>% group_by(variable) %>% summarise(N=n(),
-                                                mean=mean(value),
-                                                sd=sd(value),
-                                                max=max(value),
-                                                min(value),
-                                                median=median(value))
 
-# add in kable formatting
+annual_clean %>% 
+  mutate(variable = case_when(
+    variable == "pm2.5_ug_m3" ~ "PM2.5 (ug/m3)",
+    variable == "no2" ~ "NO2 (ppb)",
+    TRUE ~ variable
+  )) %>%
+  group_by(variable) %>% 
+  summarise(
+  #  N = n(),
+    "Arithmetic Mean" = mean(value),
+    "SD" = sd(value),
+    "Geometric Mean" = exp(mean(log(value), na.rm = TRUE)),
+    "Geometric SD" = exp(sd(log(value), na.rm = TRUE)),
+    Max = max(value),
+    Min = min(value),
+    Median = median(value)
+  ) %>%
+  rename(Pollutant = variable) %>% 
+  kable(caption = "Table 3: Descriptive statistics for Annual NO2 and PM2.5 Measurements Across Study Area Monitoring Locations (N = 304)", digits = 2) %>% 
+  kable_styling(full_width = FALSE, latex_options = c("hold_position")) %>% 
+  add_footnote("Note: The mean of winsorized medians was used to summarize site annual averages.", # pulled wording from data dictionary 
+               notation = "none", 
+               threeparttable = TRUE)
+
 ```
+
+## Summary and visualizations of air pollutant data
+Comparing the distribution of the mean values of NO2 and PM2.5 on the native and log scales. Based on these histograms, it looks like we should log transform both variables for subsequent analyses. 
+```{r var.distributions}
+# Commenting out the plots using the median values, I think we should just present the means -kt
+
+# # NO2 plot on the native scale
+# no2_native <- ggplot(data = no2_stop_clean, aes(median_value)) +
+#     geom_histogram(colour = "black", 
+#                    fill = "white") 
+# 
+# # NO2 plot on the log scale
+# no2_log <- ggplot(data = no2_stop_clean, aes(log_median)) +
+#     geom_histogram(colour = "black", 
+#                    fill = "white") 
+# 
+# # PM2.5 plot on the native scale
+# pm25_native <- ggplot(data = pm25_stop_clean, aes(median_value)) +
+#     geom_histogram(colour = "black", 
+#                    fill = "white") 
+# 
+# # PM2.5 plot on the log scale
+# pm25_log <- ggplot(data = pm25_stop_clean, aes(log_median)) +
+#     geom_histogram(colour = "black", 
+#                    fill = "white") 
+# 
+# # Add plot type and scale information to the datasets
+# no2_native_data <- no2_stop_clean %>%
+#   mutate(scale = "Native Scale", pollutant = "NO2", value = median_value)
+# 
+# no2_log_data <- no2_stop_clean %>%
+#   mutate(scale = "Log Scale", pollutant = "NO2", value = log_median)
+# 
+# pm25_native_data <- pm25_stop_clean %>%
+#   mutate(scale = "Native Scale", pollutant = "PM2.5", value = median_value)
+# 
+# pm25_log_data <- pm25_stop_clean %>%
+#   mutate(scale = "Log Scale", pollutant = "PM2.5", value = log_median)
+# 
+# # Combine all datasets
+# combined_data <- bind_rows(no2_native_data, no2_log_data, pm25_native_data, pm25_log_data)
+# 
+# # Adjusting the scale levels to reorder the columns
+# combined_data <- combined_data %>%
+#   mutate(scale = factor(scale, levels = c("Native Scale", "Log Scale"))) 
+# 
+# # Create faceted plot
+# faceted_histogram <- ggplot(data = combined_data, aes(value)) +
+#   geom_histogram(colour = "black", fill = "white", bins = 30) +
+#   facet_grid(pollutant ~ scale, scales = "free_x") +
+#   labs(x = "Median Values", y = "Frequency", title="Distribution of Median Values",
+#        caption="Distribution of native and log-transformed median values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
+#   theme_minimal() +
+#   theme(plot.title = element_text(hjust = 0.5),
+#         plot.caption = element_text(hjust = 0.5)) +
+#   theme(panel.grid.minor = element_blank()) 
+# 
+# # Display the plot
+# print(faceted_histogram)
+
+#---- Means in case we want means----
+no2_native <- ggplot(data = no2_stop_clean, aes(mean_value)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# NO2 plot on the log scale
+no2_log <- ggplot(data = no2_stop_clean, aes(log_mean)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# PM2.5 plot on the native scale
+pm25_native <- ggplot(data = pm25_stop_clean, aes(mean_value)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# PM2.5 plot on the log scale
+pm25_log <- ggplot(data = pm25_stop_clean, aes(log_mean)) +
+    geom_histogram(colour = "black", 
+                   fill = "white") 
+
+# Add plot type and scale information to the datasets
+no2_native_data <- no2_stop_clean %>%
+  mutate(scale = "Native Scale", pollutant = "NO2", value = mean_value)
+
+no2_log_data <- no2_stop_clean %>%
+  mutate(scale = "Log Scale", pollutant = "NO2", value = log_mean)
+
+pm25_native_data <- pm25_stop_clean %>%
+  mutate(scale = "Native Scale", pollutant = "PM2.5", value = mean_value)
+
+pm25_log_data <- pm25_stop_clean %>%
+  mutate(scale = "Log Scale", pollutant = "PM2.5", value = log_mean)
+
+# Combine all datasets
+combined_data <- bind_rows(no2_native_data, no2_log_data, pm25_native_data, pm25_log_data)
+
+# Adjusting the scale levels to reorder the columns
+combined_data <- combined_data %>%
+  mutate(scale = factor(scale, levels = c("Native Scale", "Log Scale"))) 
+
+# Create faceted plot
+faceted_histogram <- ggplot(data = combined_data, aes(value)) +
+  geom_histogram(colour = "black", fill = "white", bins = 30) +
+  facet_grid(pollutant ~ scale, scales = "free_x") +
+  labs(x = "Mean Values", y = "Frequency", title="Figure 1. Distribution of Mean Values",
+       caption="Distribution of native and log-transformed mean values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0.5)) +
+  theme(panel.grid.minor = element_blank()) 
+
+# Display the plot
+print(faceted_histogram)
+```
+
 
 # Prediction model components
 
@@ -765,7 +906,6 @@ ggplot(data = vgm_no2_annual, aes(x = dist, y = gamma)) +
 ```
 
 ```{r}
-
 # Estimate the empirical variogram
 ##  By default, the variogram() function limits the maximum lag distance. Increasing the cutoff parameter will allow it to calculate semivariance values over a larger distance, which might help the semivariogram level off if it's naturally reaching a sill
 v_stop <- variogram(log_mean ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, data=stop_for_preds %>% filter(variable == "no2"))
@@ -862,10 +1002,10 @@ ln.no2.kr <- krige(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_t
 # Calculate standard errors to assess prediction uncertainty across locations
 ln.no2.kr$se <- sqrt(ln.no2.kr$var1.var)  # Standard error is the square root of variance
 
-# Plot UK predictions --> nothing generating on the map
+# Plot UK predictions 
 pl3 <- plot(ln.no2.kr["var1.pred"], main = "UK Prediction of Log(NO2)")
 
-# Plot UK prediction standard errors --> nothing generating on the map
+# Plot UK prediction standard errors 
 pl4 <- plot(ln.no2.kr["se"], main = "UK Prediction Error NO2 (Standard Error)")
 
 ```
@@ -1083,7 +1223,7 @@ ln.PM25.kr <- st_transform(ln.PM25.kr, latlong_proj)
 all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.no2.kr))
 all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.PM25.kr))
 
-# Join LA grid to predictions; do so by nearest feature to avoid precision merging issues
+# Join grid to predictions; do so by nearest feature to avoid precision merging issues
 new_blocks_no2 <- st_join(blocks_for_preds, ln.no2.kr, join = st_nearest_feature) %>% 
   rename(`NO2 (ppb)` = var1.pred.native, 
          `ln(NO2) ln(ppb)`=var1.pred,
@@ -1147,10 +1287,6 @@ full_data_w_preds <- acs_simplified %>% left_join(predicted_to_tracts_no2, join_
 ```{r}
 # Regression between annual PM2.5 concentrations and various demographics
 
-#PM2.5 x poverty
-pm_poverty <- lm(Percent_Below_Poverty ~ `PM2.5 (ug/m^3)`, 
-                 data = full_data_w_preds)
-
 # Created new columns for percent of population for each race (same as those included in demographic statistics summary table (except for "Other Langugage"))
 
 full_data_w_preds_perc <- full_data_w_preds %>% 
@@ -1160,11 +1296,17 @@ full_data_w_preds_perc <- full_data_w_preds %>%
            p_AIAN = (AIAN / Total_Pop)*100,
            p_Asian = (Asian / Total_Pop)*100,
            p_HPI = (Hawaiian_PacificIslander / Total_Pop)*100,
-           p_Hispanic = (Hawaiian_PacificIslander / Total_Pop)*100,
+           p_Hispanic = (HispanicorLatino / Total_Pop)*100,
            p_engl_only = (English_only / Total_Pop)*100,
            p_lang_other = (Language_other_than_English / Total_Pop)*100,
            p_spanish = (Spanish / Total_Pop)*100
            )
+
+
+## I think all of these need to be edited (the predictor and response variables are switched) -kt
+#PM2.5 x poverty
+pm_poverty <- lm(Percent_Below_Poverty ~ `PM2.5 (ug/m^3)`, 
+                 data = full_data_w_preds)
            
 # PM2.5 x White
 pm_white <- lm(p_White ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
@@ -1192,12 +1334,52 @@ pm_lang_other <- lm(p_lang_other ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_pe
 pm_spanish <- lm(p_spanish ~ `PM2.5 (ug/m^3)`, data = full_data_w_preds_perc)
 
 
-# Summary of associations between PM2.5 and demographics
+# Multiple linear regression model for PM2.5
+pm_full <- lm(`PM2.5 (ug/m^3)` ~ Percent_Below_Poverty + p_engl_only + p_lang_other + p_spanish + p_White + p_BlackAA + p_AIAN + p_Asian + p_HPI + p_Hispanic, data = full_data_w_preds_perc)
 
+# Extract regression results for PM2.5 model
+pm_full_results <- tidy(pm_full)
+
+# Formatted table for regression results
+pm_full_results %>%
+  select(term, estimate, std.error, statistic, p.value) %>% 
+  mutate(
+    Term = case_when(
+      term == "(Intercept)" ~ "Intercept",
+      term == "Percent_Below_Poverty" ~ "% Below Poverty",
+      term == "p_engl_only" ~ "% English Language Only",
+      term == "p_lang_other" ~ "% Other Language",
+      term == "p_spanish" ~ "% Spanish Language",
+      term == "p_White" ~ "% White",
+      term == "p_BlackAA" ~ "% Black or African American",
+      term == "p_AIAN" ~ "% American Indian or Alaska Native",
+      term == "p_Asian" ~ "% Asian",
+      term == "p_HPI" ~ "% Hawaiian or Pacific Islander",
+      term == "p_Hispanic" ~ "% Hispanic or Latino",
+      TRUE ~ term 
+    )
+  ) %>%
+  select(Term, estimate, std.error, statistic, p.value) %>%
+  rename(
+    Estimate = estimate,
+    `Std. Error` = std.error,
+    `t-value` = statistic,
+    `P-value` = p.value
+  ) %>% 
+  kable(
+    caption = "Table: Regression for Association Results for PM2.5 Model",
+    digits = 3, 
+    col.names = c("Term", "Estimate", "Std. Error", "t-value", "P-value")
+  ) %>%
+  kable_styling(
+    full_width = FALSE, 
+    bootstrap_options = c("striped", "hover", "condensed")
+  )
 
 ```
 
 ```{r}
+## Again, I think all of these need to be edited (the predictor and response variables are switched) -kt
 # Associations between annual NO2 concentrations and various demographics
 
 # NO2 x poverty
@@ -1230,8 +1412,146 @@ no2_lang_other <- lm(p_lang_other ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
 no2_spanish <- lm(p_spanish ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
 
 
-# Summary of associations between PM2.5 and demographics
+# Multiple linear regression model for NO2
+no2_full <- lm(`NO2 (ppb)` ~ Percent_Below_Poverty + p_engl_only + p_lang_other + p_spanish + p_White + p_BlackAA + p_AIAN + p_Asian + p_HPI + p_Hispanic, data = full_data_w_preds_perc)
 
+# Extract regression results for NO2 model
+no2_full_results <- tidy(no2_full)
+
+# Formatted table for regression results
+no2_full_results %>%
+  select(term, estimate, std.error, statistic, p.value) %>% 
+  mutate(
+    Term = case_when(
+      term == "(Intercept)" ~ "Intercept",
+      term == "Percent_Below_Poverty" ~ "% Below Poverty",
+      term == "p_engl_only" ~ "% English Language Only",
+      term == "p_lang_other" ~ "% Other Language",
+      term == "p_spanish" ~ "% Spanish Language",
+      term == "p_White" ~ "% White",
+      term == "p_BlackAA" ~ "% Black or African American",
+      term == "p_AIAN" ~ "% American Indian or Alaska Native",
+      term == "p_Asian" ~ "% Asian",
+      term == "p_HPI" ~ "% Hawaiian or Pacific Islander",
+      term == "p_Hispanic" ~ "% Hispanic or Latino",
+      TRUE ~ term 
+    )
+  ) %>%
+  select(Term, estimate, std.error, statistic, p.value) %>%
+  rename(
+    Estimate = estimate,
+    `Std. Error` = std.error,
+    `t-value` = statistic,
+    `P-value` = p.value
+  ) %>% 
+  kable(
+    caption = "Table: Regression for Association Results for NO2 Model",
+    digits = 3, 
+    col.names = c("Term", "Estimate", "Std. Error", "t-value", "P-value")
+  ) %>%
+  kable_styling(
+    full_width = FALSE, 
+    bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+
+```
+
+# Chloropleth visualization of predicted pollutants with demographic variables
+
+```{r pm25.chloropleth.map}
+## The below code to merge the full dataset with the census geometries is kinda trash. Would love your expertise in cleaning it up Cecilia :-D
+
+# Ensure `census_clean` is an sf object
+census_clean_sf <- st_as_sf(census_clean)
+
+# Select only the `AFFGEOID` and `geometry` columns
+census_geometry <- census_clean_sf %>%
+  select(AFFGEOID, geometry) %>% 
+  rename(GEO_ID = AFFGEOID)
+
+# Drop geometry temporarily
+census_geometry_nonspatial <- st_drop_geometry(census_geometry)
+
+# Perform join
+full_data_w_preds_perc_spatial <- full_data_w_preds_perc %>%
+  left_join(census_geometry_nonspatial, by = "GEO_ID") 
+
+# Reattach geometry to the joined data
+full_data_w_preds_perc_spatial <- st_as_sf(
+  left_join(census_clean_sf, full_data_w_preds_perc_spatial, by = c("AFFGEOID" = "GEO_ID"))
+) %>% 
+  filter(!is.na(NAME.y))
+
+
+# generating plots for significant predictors from regression results
+
+# PM2.5 and % Below Poverty Map
+
+# Classify data for bivariate mapping
+pm_poverty_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `PM2.5 (ug/m^3)`, 
+  y = Percent_Below_Poverty, 
+  style = "quantile", 
+  dim = 3 
+)
+
+# Define the bounding box for the study area
+map_bbox <- st_bbox(data_bivariate)
+
+# Generate the bivariate map
+pm_poverty_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
+  geom_sf(data = data_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "Relationship between Predicted PM2.5 (ug/m^3) and % Below Poverty"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
+# Create legend as a matrix of colors
+legend <- bi_legend(
+  pal = "PurpleGrn",
+  dim = 3,
+  xlab = "Higher PM2.5",
+  ylab = "Higher Poverty",
+  size = 8 
+)
+
+# Combine the map and the legend
+pm_poverty_map <- pm_poverty_map + inset_element(
+  legend,
+  left = 1.05,
+  bottom = 0.1,
+  right = 1.35,
+  top = 0.4     
+)
+
+pm_poverty_map
+
+# PM2.5 and % English Language Only Map
+
+# PM2.5 and % White Map
+
+# PM2.5 and % Hispanic or Latino Map
+
+```
+
+
+```{r no2.chloropleth.map}
+## generating plots for significant predictors from regression results
+# NO2 and % Below Poverty Map
+
+# NO2 and % English Language Only Map
+
+# NO2 and % White Map
 
 ```
 
