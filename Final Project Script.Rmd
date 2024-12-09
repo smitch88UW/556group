@@ -1463,10 +1463,10 @@ no2_full_results %>%
 ## The below code to merge the full dataset with the census geometries is kinda trash. Would love your expertise in cleaning it up Cecilia :-D
 
 # Ensure `census_clean` is an sf object
-census_clean_sf <- st_as_sf(census_clean)
+census_clean <- st_as_sf(census_clean)
 
 # Select only the `AFFGEOID` and `geometry` columns
-census_geometry <- census_clean_sf %>%
+census_geometry <- census_clean %>%
   select(AFFGEOID, geometry) %>% 
   rename(GEO_ID = AFFGEOID)
 
@@ -1485,6 +1485,8 @@ full_data_w_preds_perc_spatial <- st_as_sf(
 
 
 # generating plots for significant predictors from regression results
+# Define the bounding box for the study area
+map_bbox <- st_bbox(pm_poverty_bivariate)
 
 # PM2.5 and % Below Poverty Map
 
@@ -1497,16 +1499,13 @@ pm_poverty_bivariate <- bi_class(
   dim = 3 
 )
 
-# Define the bounding box for the study area
-map_bbox <- st_bbox(pm_poverty_bivariate)
-
 # Generate the bivariate map
 pm_poverty_map <- ggplot() +
   ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
   geom_sf(data = pm_poverty_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "Relationship between Predicted PM2.5 (ug/m^3)\n and % Below Poverty"
+    title = "% Below Poverty"
   ) +
   theme_minimal() +
   theme(
@@ -1517,31 +1516,193 @@ pm_poverty_map <- ggplot() +
   )
 
 # Create legend as a matrix of colors
-legend <- bi_legend(
-  pal = "PurpleGrn",
-  dim = 3,
-  xlab = "Higher PM2.5",
-  ylab = "Higher Poverty",
-  size = 8 
-)
+# legend <- bi_legend(
+#   pal = "PurpleGrn",
+#   dim = 3,
+#   xlab = "Higher PM2.5",
+#   ylab = "Higher Poverty",
+#   size = 12
+# )
 
 # Combine the map and the legend
-pm_poverty_map <- pm_poverty_map + inset_element(
-  legend,
-  left = 1.05,
-  bottom = 0.1,
-  right = 1.35,
-  top = 0.4     
-)
+# pm_poverty_map <- pm_poverty_map + inset_element(
+#   legend,
+#   left = 1.05,
+#   bottom = 0.1,
+#   right = 1.35,
+#   top = 0.4     
+# )
 
-pm_poverty_map
 
 # PM2.5 and % English Language Only Map
 
+# Classify data for bivariate mapping
+pm_english_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `PM2.5 (ug/m^3)`, 
+  y = 'p_engl_only', 
+  style = "quantile", 
+  dim = 3 
+)
+
+# Generate the bivariate map
+pm_english_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
+  geom_sf(data = pm_english_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "% Only English Language Speaking"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
+# Create legend as a matrix of colors
+# legend <- bi_legend(
+#   pal = "PurpleGrn",
+#   dim = 3,
+#   xlab = "Higher PM2.5",
+#   ylab = "Higher English Spoken as the Only Language",
+#   size = 12
+# )
+# 
+# # Combine the map and the legend
+# pm_english_map <- pm_english_map + inset_element(
+#   legend,
+#   left = 1.05,
+#   bottom = 0.1,
+#   right = 1.35,
+#   top = 0.4     
+# )
+
+
 # PM2.5 and % White Map
+# Classify data for bivariate mapping
+pm_white_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `PM2.5 (ug/m^3)`, 
+  y = 'p_White', 
+  style = "quantile", 
+  dim = 3 
+)
+
+# Generate the bivariate map
+pm_white_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
+  geom_sf(data = pm_white_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "% White"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
+# Create legend as a matrix of colors
+# legend <- bi_legend(
+#   pal = "PurpleGrn",
+#   dim = 3,
+#   xlab = "Higher PM2.5",
+#   ylab = "Higher % White",
+#   size = 12
+# )
+# 
+# # Combine the map and the legend
+# pm_white_map <- pm_white_map + inset_element(
+#   legend,
+#   left = 1.05,
+#   bottom = 0.1,
+#   right = 1.35,
+#   top = 0.4     
+# )
+
 
 # PM2.5 and % Hispanic or Latino Map
+# Classify data for bivariate mapping
+pm_hispanic_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `PM2.5 (ug/m^3)`, 
+  y = 'p_Hispanic', 
+  style = "quantile", 
+  dim = 3 
+)
 
+# Generate the bivariate map
+pm_hispanic_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
+  geom_sf(data = pm_hispanic_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "% Hispanic or Latino"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
+# Create legend as a matrix of colors
+# legend <- bi_legend(
+#   pal = "PurpleGrn",
+#   dim = 3,
+#   xlab = "Higher PM2.5",
+#   ylab = "Higher % Hispanic or Latino",
+#   size = 12
+# )
+# 
+# # Combine the map and the legend
+# pm_hispanic_map <- pm_hispanic_map + inset_element(
+#   legend,
+#   left = 1.05,
+#   bottom = 0.1,
+#   right = 1.35,
+#   top = 0.4     
+# )
+
+
+# Combine 4 maps together
+# Create a single legend
+common_legend <- bi_legend(
+  pal = "PurpleGrn",
+  dim = 3,
+  xlab = "Higher PM2.5",
+  ylab = "Higher % of Demographic Variable (e.g., Poverty, White, etc.)",
+  size = 8
+) +
+  theme(
+    legend.key.width = unit(0.5, "cm"), 
+    legend.key.height = unit(0.5, "cm") 
+  )
+
+# Combine the maps without individual legends
+combined_pm_chloropleth <- (pm_poverty_map + theme(legend.position = "none") |
+                  pm_english_map + theme(legend.position = "none")) /
+                 (pm_white_map + theme(legend.position = "none") |
+                  pm_hispanic_map + theme(legend.position = "none"))
+
+
+# Add title and legend in the correct layout
+combined_pm_chloropleth <- (combined_pm_chloropleth | wrap_elements(common_legend)) +
+  plot_annotation(
+    title = "Fiugre: Relationship between Predicted PM2.5 (ug/m^3)\nand Significant Demographic Variables from Regression Results",
+    theme = theme(
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, margin = margin(b = 20))
+    )
+  ) +
+  plot_layout(widths = c(4, 1))
+
+# Display the final plot
+print(combined_pm_chloropleth)
 ```
 
 
