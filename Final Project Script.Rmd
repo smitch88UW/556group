@@ -58,7 +58,7 @@ pacman::p_load(
     tigris,
     RColorBrewer,
     scales,
-    kableExtra
+    kableExtra, patchwork
 )
 
 ```
@@ -1498,15 +1498,15 @@ pm_poverty_bivariate <- bi_class(
 )
 
 # Define the bounding box for the study area
-map_bbox <- st_bbox(data_bivariate)
+map_bbox <- st_bbox(pm_poverty_bivariate)
 
 # Generate the bivariate map
 pm_poverty_map <- ggplot() +
   ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
-  geom_sf(data = data_bivariate, aes(fill = bi_class), color = NA) +
+  geom_sf(data = pm_poverty_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "Relationship between Predicted PM2.5 (ug/m^3) and % Below Poverty"
+    title = "Relationship between Predicted PM2.5 (ug/m^3)\n and % Below Poverty"
   ) +
   theme_minimal() +
   theme(
