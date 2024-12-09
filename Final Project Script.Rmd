@@ -1457,9 +1457,9 @@ no2_full_results %>%
 
 ```
 
-# Chloropleth visualization of predicted pollutants with demographic variables
+# Choropleth visualization of predicted pollutants with demographic variables
 
-```{r pm25.chloropleth.map}
+```{r pm25.choropleth.map}
 ## The below code to merge the full dataset with the census geometries is kinda trash. Would love your expertise in cleaning it up Cecilia :-D
 
 # Ensure `census_clean` is an sf object
@@ -1479,14 +1479,12 @@ full_data_w_preds_perc_spatial <- full_data_w_preds_perc %>%
 
 # Reattach geometry to the joined data
 full_data_w_preds_perc_spatial <- st_as_sf(
-  left_join(census_clean_sf, full_data_w_preds_perc_spatial, by = c("AFFGEOID" = "GEO_ID"))
+  left_join(census_clean, full_data_w_preds_perc_spatial, by = c("AFFGEOID" = "GEO_ID"))
 ) %>% 
   filter(!is.na(NAME.y))
 
 
 # generating plots for significant predictors from regression results
-# Define the bounding box for the study area
-map_bbox <- st_bbox(pm_poverty_bivariate)
 
 # PM2.5 and % Below Poverty Map
 
@@ -1498,6 +1496,9 @@ pm_poverty_bivariate <- bi_class(
   style = "quantile", 
   dim = 3 
 )
+
+# Define the bounding box for the study area
+map_bbox <- st_bbox(pm_poverty_bivariate)
 
 # Generate the bivariate map
 pm_poverty_map <- ggplot() +
@@ -1685,16 +1686,16 @@ common_legend <- bi_legend(
   )
 
 # Combine the maps without individual legends
-combined_pm_chloropleth <- (pm_poverty_map + theme(legend.position = "none") |
+combined_pm_choropleth <- (pm_poverty_map + theme(legend.position = "none") |
                   pm_english_map + theme(legend.position = "none")) /
                  (pm_white_map + theme(legend.position = "none") |
                   pm_hispanic_map + theme(legend.position = "none"))
 
 
 # Add title and legend in the correct layout
-combined_pm_chloropleth <- (combined_pm_chloropleth | wrap_elements(common_legend)) +
+combined_pm_choropleth <- (combined_pm_choropleth | wrap_elements(common_legend)) +
   plot_annotation(
-    title = "Fiugre: Relationship between Predicted PM2.5 (ug/m^3)\nand Significant Demographic Variables from Regression Results",
+    title = "Figure: Relationship between Predicted PM2.5 (ug/m^3)\nand Significant Demographic Variables from Regression Results",
     theme = theme(
       plot.title = element_text(size = 18, face = "bold", hjust = 0.5, margin = margin(b = 20))
     )
@@ -1702,17 +1703,161 @@ combined_pm_chloropleth <- (combined_pm_chloropleth | wrap_elements(common_legen
   plot_layout(widths = c(4, 1))
 
 # Display the final plot
-print(combined_pm_chloropleth)
+print(combined_pm_choropleth)
 ```
 
 
-```{r no2.chloropleth.map}
+```{r no2.choropleth.map}
 ## generating plots for significant predictors from regression results
+
 # NO2 and % Below Poverty Map
+# Classify data for bivariate mapping
+no2_poverty_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `NO2 (ppb)`, 
+  y = Percent_Below_Poverty, 
+  style = "quantile", 
+  dim = 3 
+)
+
+# Define the bounding box for the study area
+map_bbox <- st_bbox(no2_poverty_bivariate)
+
+# Generate the bivariate map
+no2_poverty_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
+  geom_sf(data = no2_poverty_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "% Below Poverty"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
 
 # NO2 and % English Language Only Map
 
+
+# Classify data for bivariate mapping
+no2_english_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `NO2 (ppb)`, 
+  y = 'p_engl_only', 
+  style = "quantile", 
+  dim = 3 
+)
+
+# Generate the bivariate map
+no2_english_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
+  geom_sf(data = no2_english_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "% Only English Language Speaking"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
+
 # NO2 and % White Map
+# Classify data for bivariate mapping
+no2_white_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `NO2 (ppb)`, 
+  y = 'p_White', 
+  style = "quantile", 
+  dim = 3 
+)
+
+# Generate the bivariate map
+no2_white_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
+  geom_sf(data = no2_white_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "% White"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
+
+# # including this code if we want to be consistent with PM2.5 map, but % Hispanic wasn't a significant predictor in regression model for NO2 - need to note in write-up
+
+# NO2 and % Hispanic or Latino Map
+# Classify data for bivariate mapping
+no2_hispanic_bivariate <- bi_class(
+  full_data_w_preds_perc_spatial,
+  x = `NO2 (ppb)`,
+  y = 'p_Hispanic',
+  style = "quantile",
+  dim = 3
+)
+
+# Generate the bivariate map
+no2_hispanic_map <- ggplot() +
+  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +
+  geom_sf(data = no2_hispanic_bivariate, aes(fill = bi_class), color = NA) +
+  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
+  labs(
+    title = "% Hispanic or Latino"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 10),
+    legend.position = "none"
+  )
+
+
+# Combine 4 maps together
+# Create a single legend
+common_legend <- bi_legend(
+  pal = "PurpleGrn",
+  dim = 3,
+  xlab = "Higher NO2",
+  ylab = "Higher % of Demographic Variable (e.g., Poverty, White, etc.)",
+  size = 8
+) +
+  theme(
+    legend.key.width = unit(0.5, "cm"), 
+    legend.key.height = unit(0.5, "cm") 
+  )
+
+# Combine the maps without individual legends
+combined_no2_choropleth <- (no2_poverty_map + theme(legend.position = "none") |
+                  no2_english_map + theme(legend.position = "none")) /
+                 (no2_white_map + theme(legend.position = "none") |
+                  no2_hispanic_map + theme(legend.position = "none"))
+
+
+# Add title and legend in the correct layout
+combined_no2_choropleth <- (combined_no2_choropleth | wrap_elements(common_legend)) +
+  plot_annotation(
+    title = "Figure: Relationship between Predicted NO2 (ppb)\nand Significant Demographic Variables from Regression Results",
+    theme = theme(
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, margin = margin(b = 20))
+    )
+  ) +
+  plot_layout(widths = c(4, 1))
+
+# Display the final plot
+print(combined_no2_choropleth)
 
 ```
 
@@ -1721,7 +1866,7 @@ print(combined_pm_chloropleth)
 
 Percent below poverty and pollutant concentrations are not linearly related, as evidenced by the below scatter plot.
 
-```{r a useful plot to include, eval=T, echo = T, include = T}
+```{r a useful plot to include, eval=F}
 #Box plot of pollutant concentrations by %below FPL...need to fix x axis so its more convincing (Jorge)
 
 ## I think to make it more convincing, we should just use a scatterplot, as these are both continuous variables and we're interested in the association (Cecilia)
@@ -2516,7 +2661,7 @@ ggplot() +
   )
 ```
 
-#Racial map chloropleth
+#Racial map choropleth
 Text for write up: 
 This map displays the dominant racial or ethnic group by census tract in Snohomish, Pierce, and King County, Washington, overlaid on an OpenStreetMap basemap for geographic context. Each tract is color-coded to represent the racial or ethnic group with the highest proportion of residents. Groups represented include American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. This visualization highlights the spatial distribution of demographic dominance across the county, providing insights into the region's racial and ethnic diversity. Data sources include the American Community Survey (ACS), Mobile Monitoring, and OpenStreetMap.
 ```{r, eval=FALSE}
