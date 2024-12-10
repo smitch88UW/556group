@@ -45,26 +45,23 @@ if (!require("rnaturalearthhires")) {
 }
 
 pacman::p_load(
-    tidyverse,                 # Data manipulation and visualization
-    # takes a while to install on SPH
+    tidyverse,                 
     biscale,
     broom,
-    ggspatial,                 # Geospatial extensions for ggplot.  
-    maptiles, # maptiles and tmap libraries can be used instead of or in combination with ggplot + ggspatial. maptiles offers more tile-based map flexibility; ggspatial provides the ability to annotate maps easily; tmap offers both static and interactive maps that we won't review in this course. 
-    terra, # alternative mapping with raster files
-    
-    # need for SPH server?
+    ggspatial,                  
+    maptiles,  
+    terra, 
     prettymapr,
     
-    rnaturalearth,             # Land features for map layers (remove water locations)
-    rnaturalearthhires,        # High-resolution land features 
-    sf,                        # Handling spatial objects (modern replacement for 'sp')
-    knitr,                     # Formatting tables with kable()
-    gstat,                     # Geostatistical methods (e.g., kriging)
-    Hmisc,                     # Data description functions like describe()
-    scales,                    # Color scale customization for ggplot
-    akima,                     # Bivariate interpolation for irregular data
-    downloader,                 # Downloading files over HTTP/HTTPS
+    rnaturalearth,             
+    rnaturalearthhires,        
+    sf,                        
+    knitr,                     
+    gstat,                    
+    Hmisc,                    
+    scales,                    
+    akima,                     
+    downloader,                
     tigris,
     RColorBrewer,
     scales,
@@ -100,7 +97,6 @@ census_blocks_covar <- read_csv("wa_block_covar_clean.csv")
 
 ```{r data.cleaning}
 # annual data
-#glimpse(annual_data)
 table(annual_data$variable)
 
 #create variable to differentiate between stop site and collocation site
@@ -108,7 +104,7 @@ annual_data <- annual_data %>%
   mutate(SiteType = ifelse(grepl("MS", location), "stop site",
                        ifelse(grepl("MC", location), "collocation site", NA)))
 
-# keep only NO2 and PM, get rid of annual variable since they are all mean_of_win_medians
+# keep only NO2 and PM
 annual_clean <- annual_data %>% 
   filter(variable == "no2" | variable == "pm2.5_ug_m3") %>%
   filter(SiteType == "stop site") %>% 
@@ -131,10 +127,10 @@ stop_coords <- annual_clean %>% select(c("location", "longitude", "latitude")) %
   unique()
 
 stop_clean <- stop_clean %>% 
-  filter(median_value > 0) %>% # what are our thoughts on this? Thought: should we report how many this got rid of?
+  filter(median_value > 0) %>% 
   mutate(log_mean = log(mean_value)) %>% 
   mutate(log_median = log(median_value)) %>% 
-  filter(log_median > 0) %>% # and on this? 
+  filter(log_median > 0) %>% 
   left_join(stop_coords)
 
 # Generate NO2 specific dataset
@@ -147,7 +143,6 @@ pm25_stop_clean <- stop_clean %>%
 
 
 # census data
-#glimpse(census_shapefile)
 table(census_shapefile$COUNTYFP) # there are 39 counties, we don't need them all 
 # only keep King (033), Snohomish (061), Pierce (053), Kitsap (035)
 # get rid of LSAD and STATEFP since they are all the same
@@ -157,10 +152,8 @@ census_clean <- census_shapefile %>%
   st_as_sf()
 
 # grid covar
-#glimpse(grid_covariates)
 # create 6 digit TRACTCE var that matches census shapefile var
 # log-transform distance covariates
-
 grid_covar_clean <- grid_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key)))) %>%
@@ -172,7 +165,6 @@ grid_covar_clean <- grid_covariates %>%
   select(-c(m_to_a1,m_to_a2,m_to_a3,m_to_coast,m_to_l_airp,m_to_comm))
 
 # mobile covar
-#glimpse(mobile_covariates)
 # create 6 digit TRACTCE var that matches census shapefile var
 mobile_covar_clean <- mobile_covariates %>%
   mutate(TRACTCE = substr(as.character(tract_key), 
@@ -195,29 +187,22 @@ stop_mobile_census <- census_clean %>%
 
 
 # acs race data
-#glimpse(acs_race)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_race_clean <- acs_race %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-#colnames(acs_race_clean)
+
 # acs ethnicity data
-#glimpse(acs_ethnicity)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_ethnicity_clean <- acs_ethnicity %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-#colnames(acs_ethnicity_clean)
+
 # acs language data
-#glimpse(acs_language)
 # create 6 digit TRACTCE var that matches census shapefile var
 acs_language_clean <- acs_language %>%
   mutate(TRACTCE = substr(as.character(GEO_ID), 
             nchar(as.character(GEO_ID)) - 5, nchar(as.character(GEO_ID))))
-#colnames(acs_language_clean)
-# acs median income data
-#glimpse(acs_median_income)
-# create 6 digit TRACTCE var that matches census shapefile var
 
 ```
 
@@ -238,7 +223,6 @@ census_blocks_covar_clean <- census_blocks_covar %>%
 ```
 
 ```{r merge.acs.files}
-#--------------Steph & Jorge edits Nov 30
 # merge and clean language, race, ethnicity and poverty datasets
 # filter out the water census tracts, cleaned up NAs
 acs_combined <- reduce(
@@ -265,9 +249,6 @@ acs_simplified <- acs_combined %>%
   ) %>% #fixing incorrect Total_Pop for Pierce County tract 729.06
   mutate(Total_Pop=case_when(NAME=="Census Tract 729.06, Pierce County, Washington" ~ 1995,
                              .default=Total_Pop))
-
-#-----------------------# Data Dictionary for ACS Combined Dataset # 
-# GEO_ID : Unique identifier for the geographic area (e.g., census tract, block group) # NAME : Name of the geographic area (e.g., "Census Tract 1, County, State") # TRACTCE : Census tract code, uniquely identifying the geographic unit within a county # # Household Demographics: # White_Households : Number of households with a White population # Black_Households : Number of households with a Black or African American population # AIAN_Households : Number of households with an American Indian or Alaska Native (AIAN) population # Asian_Households : Number of households with an Asian population # Hawaiian_PI_Households : Number of households with a Native Hawaiian or Pacific Islander (Hawaiian_PI) population # Other_alone_Households : Number of households with people from other racial/ethnic groups (alone) # HispanicorLatino_Households : Number of households with a Hispanic or Latino population #
 
 ```
 
@@ -382,7 +363,7 @@ combined_data <- combined_data %>%
 faceted_histogram <- ggplot(data = combined_data, aes(value)) +
   geom_histogram(colour = "black", fill = "white", bins = 30) +
   facet_grid(pollutant ~ scale, scales = "free_x") +
-  labs(x = "Mean Values", y = "Frequency", title="Figure 1. Distribution of Mean Values",
+  labs(x = "Mean Values", y = "Frequency", title="Figure 1: Distribution of Mean Values",
        caption="Distribution of native and log-transformed mean values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5),
@@ -420,7 +401,7 @@ annual_clean %>%
 
 ```
 
-```{r set.up.sf.data, include=FALSE}
+```{r set.up.sf.data, include=FALSE, warning=FALSE}
 
 latlong_proj <- 4326  
 
@@ -443,14 +424,14 @@ grid_covar_clean <- grid_covar_clean %>%
 # the CRS for this is in lat/long degrees
 land <- ne_download(scale = "large", type = "land", category = "physical", returnclass = "sf")
 
-# Crop the land area to the bounding box of the LA grid to reduce processing time
-# have to convert the la_grid to the same degrees as LA
+# Crop the land area to the bounding box of the study grid to reduce processing time
+# have to convert the grid to the same degrees as land
 land <- suppressWarnings(st_crop(land, st_bbox(grid_covar_clean))) 
 
 # Visualize cropped land area
 ggplot(land) + geom_sf()
 
-# Filter la_grid to keep only points that intersect with land
+# Filter grid to keep only points that intersect with land
 grid_covar_clean <- grid_covar_clean[st_within(grid_covar_clean, land) %>% lengths() > 0,]
 
 # Visualize grid land locations (zoom in)
@@ -458,7 +439,7 @@ ggplot(grid_covar_clean) + geom_sf(size=0.001)
 
 ```
 
-```{r study.area.map.setup}
+```{r study.area.map.setup, warning=FALSE}
 # ---- Study Area Map Setup ----
 # Define a bounding box (min & max X and Y) with a 10,000m buffer around `grid_covar_clean`
 map_bbox <- grid_covar_clean %>%
@@ -471,7 +452,6 @@ map_bbox <- grid_covar_clean %>%
   # take the min/max X/Y
   st_bbox()
 
-#map_bbox
 
 # Base map setup with ggplot2 and ggspatial using OSM tiles
 g <- ggplot() +
@@ -571,14 +551,14 @@ vgm_no2_annual <- variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + lo
 
 # deleted code for the stop data because it runs forever
 
-# pretty - moved the actual plot to the Appendix!
+# moved the actual plot to the Appendix!
 # ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) + 
 #   geom_point(alpha=0.1) + 
 #   labs(x="Distance (meters)",
 #        title="Variogram Cloud Using Annual Mean Concentration: NO2")
 
 
-# Binned Variogram with annual data --> prettier! -- moved actual plot to appendix -cm
+# Binned Variogram with annual data -- moved actual plot to appendix -cm
 #plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")), main="Binned Variogram with Annual Concentration Data: NO2")
 
 # Binned Variogram with Point Counts
@@ -604,7 +584,7 @@ v_annual.fit
 
 # Plot the empirical variogram with the fitted model overlaid
 # consider expanding the x-axis here - moved to Appendix
-#plot(v_annual, v_annual.fit, main="Empirical Variogram with Fitted Model Overlaid: NO2")
+# plot(v_annual, v_annual.fit, main="Empirical Variogram with Fitted Model Overlaid: NO2")
 
 ```
 
@@ -792,13 +772,13 @@ cv10uk_no2 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + lo
                  model = m_annual.uk,
                  nfold = 10)
 
-# Calculate and compare performance statistics across cross-validation methods
-# Compile results into a summary table
-bind_rows(
-  krige.cv.stats(cv5uk_no2, "UK: 5-Fold CV NO2"),
-  krige.cv.stats(cv10uk_no2, "UK: 10-Fold CV NO2")
-) %>% 
-  kable(caption = "Summary of Kriging Cross-Validation Results for log(NO2)") %>% kable_styling()
+# # Calculate and compare performance statistics across cross-validation methods
+# # Compile results into a summary table
+# bind_rows(
+#   krige.cv.stats(cv5uk_no2, "UK: 5-Fold CV NO2"),
+#   krige.cv.stats(cv10uk_no2, "UK: 10-Fold CV NO2")
+# ) %>% 
+#   kable(caption = "Summary of Kriging Cross-Validation Results for log(NO2)") %>% kable_styling()
 
 ```
 
@@ -817,14 +797,41 @@ cv10uk_pm25 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + l
                  model = m.uk.pm25,
                  nfold = 10)
 
-# Calculate and compare performance statistics across cross-validation methods
-# Compile results into a summary table
-bind_rows(
-  krige.cv.stats(cv5uk_pm25, "UK: 5-Fold CV PM2.5"),
-  krige.cv.stats(cv10uk_pm25, "UK: 10-Fold CV PM2.5")
-) %>% 
-  kable(caption = "Summary of Kriging Cross-Validation Results for log(PM2.5)") %>% kable_styling()
+# # Calculate and compare performance statistics across cross-validation methods
+# # Compile results into a summary table
+# bind_rows(
+#   krige.cv.stats(cv5uk_pm25, "UK: 5-Fold CV PM2.5"),
+#   krige.cv.stats(cv10uk_pm25, "UK: 10-Fold CV PM2.5")
+# ) %>% 
+#   kable(caption = "Summary of Kriging Cross-Validation Results for log(PM2.5)") %>% kable_styling()
 
+```
+
+```{r CV.results.combined}
+
+# Combine the summaries for NO2 and PM2.5
+combined_CV_summary <- bind_rows(
+  # Add the NO2 results
+  bind_rows(
+    krige.cv.stats(cv5uk_no2, "UK: 5-Fold CV"),
+    krige.cv.stats(cv10uk_no2, "UK: 10-Fold CV")
+  ) %>% mutate(Pollutant = "log(NO2)"),  
+
+  # Add the PM2.5 results
+  bind_rows(
+    krige.cv.stats(cv5uk_pm25, "UK: 5-Fold CV"),
+    krige.cv.stats(cv10uk_pm25, "UK: 10-Fold CV")
+  ) %>% mutate(Pollutant = "log(PM2.5)")
+)
+
+# Rearrange columns 
+combined_CV_summary <- combined_CV_summary %>%
+  select(Description, Pollutant, everything())
+
+# Display table
+combined_CV_summary %>%
+  kable(caption = "Table 3: Combined Summary of Universal Kriging Cross-Validation Results for log(NO2) and log(PM2.5)") %>%
+  kable_styling()
 ```
 
 ```{r map.native.scale}
@@ -880,6 +887,7 @@ ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) +
   scale_color_viridis_c(option = "plasma") + 
   ggtitle("Map of Seattle Area with UK PM2.5\n Predictions Overlaid as Points") + ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
   ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering)
+
 ```
 
 ```{r merge.newblocks.acs}
@@ -915,7 +923,7 @@ full_data_w_preds %>%
     Min = min(value),
     Median = median(value)
   ) %>%
-  kable(caption = "Table X: Descriptive statistics for predicted NO2 and PM2.5 annual means in study area (n=452 census tracts).", digits = 2) %>% 
+  kable(caption = "Table 4: Descriptive statistics for predicted NO2 and PM2.5 annual means in study area (n=190 census tracts).", digits = 2) %>% 
   kable_styling(full_width = FALSE, latex_options = c("hold_position")) %>% 
   add_footnote("Note: The mean of winsorized medians was used to summarize site annual averages.", # pulled wording from data dictionary 
                notation = "none", 
@@ -948,8 +956,6 @@ full_data_w_preds_perc <- full_data_w_preds %>%
            )
 
 
-## I think all of these need to be edited (the predictor and response variables are switched) -kt
-## Edited - cm
 #PM2.5 x poverty
 pm_poverty <- lm(`ln(PM2.5) ln(ug/m^3)` ~ Percent_Below_Poverty, 
                  data = full_data_w_preds)
@@ -1053,7 +1059,7 @@ pm_full_results %>%
     `95%CI High` = conf.high
   ) %>% 
   kable(
-    caption = "Table: Regression for Association Results for PM2.5 Model. Response variable was log(PM2.5), and all results have been exponentiated.",
+    caption = "Table 5: Regression for Association Results for PM2.5 Model. Response variable was log(PM2.5), and all results have been exponentiated.",
     digits = 3, 
     col.names = c("Term", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
   ) %>%
@@ -1067,10 +1073,9 @@ pm_full_results %>%
 ```{r q3.univariate.reg.assoc.no2}
 # Regression between annual PM2.5 concentrations and various demographics
 
-# Created new columns for percent of population for each race (same as those included in demographic statistics summary table (except for "Other Langugage"))
+# Created new columns for percent of population for each race (same as those included in demographic statistics summary table (except for "Other Language"))
 
-## I think all of these need to be edited (the predictor and response variables are switched) -kt
-## Edited - cm
+
 #NO2 x poverty
 no2_poverty <- lm(`ln(NO2) ln(ppb)` ~ Percent_Below_Poverty, 
                  data = full_data_w_preds)
@@ -1173,7 +1178,7 @@ no2_full_results %>%
     `95%CI High` = conf.high
   ) %>% 
   kable(
-    caption = "Table: Regression for Association Results for NO2 Model. Response variable was log(NO2), and all results have been exponentiated.",
+    caption = "Table 6: Regression for Association Results for NO2 Model. Response variable was log(NO2), and all results have been exponentiated.",
     digits = 3, 
     col.names = c("Term", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
   ) %>%
@@ -1183,10 +1188,9 @@ no2_full_results %>%
   )
 ```
 
-## Choropleth visualization of predicted pollutants with demographic variables
+## Bivariate choropleth visualization of predicted pollutants with demographic variables
 
-```{r pm25.choropleth.map}
-## The below code to merge the full dataset with the census geometries is kinda trash. Would love your expertise in cleaning it up Cecilia :-D
+```{r pm25.choropleth.map, warning=FALSE}
 
 # Ensure `census_clean` is an sf object
 census_clean <- st_as_sf(census_clean)
@@ -1214,222 +1218,49 @@ full_data_w_preds_perc_spatial <- st_as_sf(
 
 # PM2.5 and % Below Poverty Map
 
-# Classify data for bivariate mapping
+# Bivariate classification for PM2.5 and Poverty
 pm_poverty_bivariate <- bi_class(
   full_data_w_preds_perc_spatial,
   x = `PM2.5 (ug/m^3)`, 
   y = Percent_Below_Poverty, 
   style = "quantile", 
-  dim = 3 
+  dim = 3
 )
 
-# Define the bounding box for the study area
-map_bbox <- st_bbox(pm_poverty_bivariate)
-
-# Generate the bivariate map
+# Plot the bivariate map
 pm_poverty_map <- ggplot() +
   ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
   geom_sf(data = pm_poverty_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "% Below Poverty"
+    title = "Figure 5: Relationship Between % Below Poverty \nand Predicted PM2.5 Concentrations"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    plot.subtitle = element_text(size = 12),
-    plot.caption = element_text(size = 10),
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
     legend.position = "none"
   )
 
-# Create legend as a matrix of colors
-# legend <- bi_legend(
-#   pal = "PurpleGrn",
-#   dim = 3,
-#   xlab = "Higher PM2.5",
-#   ylab = "Higher Poverty",
-#   size = 12
-# )
-
-# Combine the map and the legend
-# pm_poverty_map <- pm_poverty_map + inset_element(
-#   legend,
-#   left = 1.05,
-#   bottom = 0.1,
-#   right = 1.35,
-#   top = 0.4     
-# )
-
-
-# PM2.5 and % English Language Only Map
-
-# Classify data for bivariate mapping
-pm_english_bivariate <- bi_class(
-  full_data_w_preds_perc_spatial,
-  x = `PM2.5 (ug/m^3)`, 
-  y = 'p_engl_only', 
-  style = "quantile", 
-  dim = 3 
-)
-
-# Generate the bivariate map
-pm_english_map <- ggplot() +
-  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
-  geom_sf(data = pm_english_bivariate, aes(fill = bi_class), color = NA) +
-  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
-  labs(
-    title = "% Only English Language Speaking"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    plot.subtitle = element_text(size = 12),
-    plot.caption = element_text(size = 10),
-    legend.position = "none"
-  )
-
-# Create legend as a matrix of colors
-# legend <- bi_legend(
-#   pal = "PurpleGrn",
-#   dim = 3,
-#   xlab = "Higher PM2.5",
-#   ylab = "Higher English Spoken as the Only Language",
-#   size = 12
-# )
-# 
-# # Combine the map and the legend
-# pm_english_map <- pm_english_map + inset_element(
-#   legend,
-#   left = 1.05,
-#   bottom = 0.1,
-#   right = 1.35,
-#   top = 0.4     
-# )
-
-
-# PM2.5 and % White Map
-# Classify data for bivariate mapping
-pm_white_bivariate <- bi_class(
-  full_data_w_preds_perc_spatial,
-  x = `PM2.5 (ug/m^3)`, 
-  y = 'p_White', 
-  style = "quantile", 
-  dim = 3 
-)
-
-# Generate the bivariate map
-pm_white_map <- ggplot() +
-  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
-  geom_sf(data = pm_white_bivariate, aes(fill = bi_class), color = NA) +
-  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
-  labs(
-    title = "% White"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    plot.subtitle = element_text(size = 12),
-    plot.caption = element_text(size = 10),
-    legend.position = "none"
-  )
-
-# Create legend as a matrix of colors
-# legend <- bi_legend(
-#   pal = "PurpleGrn",
-#   dim = 3,
-#   xlab = "Higher PM2.5",
-#   ylab = "Higher % White",
-#   size = 12
-# )
-# 
-# # Combine the map and the legend
-# pm_white_map <- pm_white_map + inset_element(
-#   legend,
-#   left = 1.05,
-#   bottom = 0.1,
-#   right = 1.35,
-#   top = 0.4     
-# )
-
-
-# PM2.5 and % Hispanic or Latino Map
-# Classify data for bivariate mapping
-pm_hispanic_bivariate <- bi_class(
-  full_data_w_preds_perc_spatial,
-  x = `PM2.5 (ug/m^3)`, 
-  y = 'p_Hispanic', 
-  style = "quantile", 
-  dim = 3 
-)
-
-# Generate the bivariate map
-pm_hispanic_map <- ggplot() +
-  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
-  geom_sf(data = pm_hispanic_bivariate, aes(fill = bi_class), color = NA) +
-  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
-  labs(
-    title = "% Hispanic or Latino"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    plot.subtitle = element_text(size = 12),
-    plot.caption = element_text(size = 10),
-    legend.position = "none"
-  )
-
-# Create legend as a matrix of colors
-# legend <- bi_legend(
-#   pal = "PurpleGrn",
-#   dim = 3,
-#   xlab = "Higher PM2.5",
-#   ylab = "Higher % Hispanic or Latino",
-#   size = 12
-# )
-# 
-# # Combine the map and the legend
-# pm_hispanic_map <- pm_hispanic_map + inset_element(
-#   legend,
-#   left = 1.05,
-#   bottom = 0.1,
-#   right = 1.35,
-#   top = 0.4     
-# )
-
-
-# Combine 4 maps together
-# Create a single legend
-common_legend <- bi_legend(
+# Create the bivariate legend
+bivariate_legend <- bi_legend(
   pal = "PurpleGrn",
   dim = 3,
   xlab = "Higher PM2.5",
-  ylab = "Higher % of Demographic Variable (e.g., Poverty, White, etc.)",
-  size = 8
-) +
-  theme(
-    legend.key.width = unit(0.5, "cm"), 
-    legend.key.height = unit(0.5, "cm") 
+  ylab = "Greater % Below Poverty",
+  size = 8  
+)
+
+# Combine the map and the legend using patchwork
+pm_poverty_map <- pm_poverty_map + 
+  wrap_elements(full = bivariate_legend) +
+  plot_layout(
+    widths = c(10, 2),  
+    heights = c(1)
   )
 
-# Combine the maps without individual legends
-combined_pm_choropleth <- (pm_poverty_map + theme(legend.position = "none") |
-                  pm_english_map + theme(legend.position = "none")) /
-                 (pm_white_map + theme(legend.position = "none") |
-                  pm_hispanic_map + theme(legend.position = "none"))
-
-
-# Add title and legend in the correct layout
-combined_pm_choropleth <- (combined_pm_choropleth | wrap_elements(common_legend)) +
-  plot_annotation(
-    title = "Figure: Relationship between Predicted PM2.5 (ug/m^3)\nand Significant Demographic Variables from Regression Results",
-    theme = theme(
-      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, margin = margin(b = 20))
-    )
-  ) +
-  plot_layout(widths = c(4, 1))
-
 # Display the final plot
-print(combined_pm_choropleth)
+print(pm_poverty_map)
+
 ```
 
 ```{r no2.choropleth.map}
@@ -1454,19 +1285,39 @@ no2_poverty_map <- ggplot() +
   geom_sf(data = no2_poverty_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "% Below Poverty"
+    title = "Figure 6: Relationship Between % Below Poverty \nand Predicted NO2 Concentrations"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
     plot.subtitle = element_text(size = 12),
     plot.caption = element_text(size = 10),
     legend.position = "none"
   )
 
+# Create the bivariate legend
+bivariate_legend <- bi_legend(
+  pal = "PurpleGrn",
+  dim = 3,
+  xlab = "Higher PM2.5",
+  ylab = "Greater % Below Poverty",
+  size = 8  
+)
+
+# Combine the map and the legend using patchwork
+no2_poverty_map <- no2_poverty_map + 
+  wrap_elements(full = bivariate_legend) +
+  plot_layout(
+    widths = c(10, 2),  
+    heights = c(1)
+  )
+
+# Display the final plot
+print(no2_poverty_map)
+
+
 
 # NO2 and % English Language Only Map
-
 
 # Classify data for bivariate mapping
 no2_english_bivariate <- bi_class(
@@ -1483,106 +1334,35 @@ no2_english_map <- ggplot() +
   geom_sf(data = no2_english_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "% Only English Language Speaking"
+    title = "Figure 7: Relationship Between % English Language \nand Predicted NO2 Concentrations"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
     plot.subtitle = element_text(size = 12),
     plot.caption = element_text(size = 10),
     legend.position = "none"
   )
 
-
-# NO2 and % White Map
-# Classify data for bivariate mapping
-no2_white_bivariate <- bi_class(
-  full_data_w_preds_perc_spatial,
-  x = `NO2 (ppb)`, 
-  y = 'p_White', 
-  style = "quantile", 
-  dim = 3 
-)
-
-# Generate the bivariate map
-no2_white_map <- ggplot() +
-  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +  
-  geom_sf(data = no2_white_bivariate, aes(fill = bi_class), color = NA) +
-  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
-  labs(
-    title = "% White"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    plot.subtitle = element_text(size = 12),
-    plot.caption = element_text(size = 10),
-    legend.position = "none"
-  )
-
-
-# # including this code if we want to be consistent with PM2.5 map, but % Hispanic wasn't a significant predictor in regression model for NO2 - need to note in write-up
-
-# NO2 and % Hispanic or Latino Map
-# Classify data for bivariate mapping
-no2_hispanic_bivariate <- bi_class(
-  full_data_w_preds_perc_spatial,
-  x = `NO2 (ppb)`,
-  y = 'p_Hispanic',
-  style = "quantile",
-  dim = 3
-)
-
-# Generate the bivariate map
-no2_hispanic_map <- ggplot() +
-  ggspatial::annotation_map_tile(type = "osm", zoom = 10) +
-  geom_sf(data = no2_hispanic_bivariate, aes(fill = bi_class), color = NA) +
-  bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
-  labs(
-    title = "% Hispanic or Latino"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    plot.subtitle = element_text(size = 12),
-    plot.caption = element_text(size = 10),
-    legend.position = "none"
-  )
-
-
-# Combine 4 maps together
-# Create a single legend
-common_legend <- bi_legend(
+# Create the bivariate legend
+bivariate_legend <- bi_legend(
   pal = "PurpleGrn",
   dim = 3,
-  xlab = "Higher NO2",
-  ylab = "Higher % of Demographic Variable (e.g., Poverty, White, etc.)",
-  size = 8
-) +
-  theme(
-    legend.key.width = unit(0.5, "cm"), 
-    legend.key.height = unit(0.5, "cm") 
+  xlab = "Higher PM2.5",
+  ylab = "Greater % Below Poverty",
+  size = 8  
+)
+
+# Combine the map and the legend using patchwork
+no2_english_map <- no2_english_map + 
+  wrap_elements(full = bivariate_legend) +
+  plot_layout(
+    widths = c(10, 2),  
+    heights = c(1)
   )
 
-# Combine the maps without individual legends
-combined_no2_choropleth <- (no2_poverty_map + theme(legend.position = "none") |
-                  no2_english_map + theme(legend.position = "none")) /
-                 (no2_white_map + theme(legend.position = "none") |
-                  no2_hispanic_map + theme(legend.position = "none"))
-
-
-# Add title and legend in the correct layout
-combined_no2_choropleth <- (combined_no2_choropleth | wrap_elements(common_legend)) +
-  plot_annotation(
-    title = "Figure: Relationship between Predicted NO2 (ppb)\nand Significant Demographic Variables from Regression Results",
-    theme = theme(
-      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, margin = margin(b = 20))
-    )
-  ) +
-  plot_layout(widths = c(4, 1))
-
 # Display the final plot
-print(combined_no2_choropleth)
+print(no2_english_map)
 
 ```
 
@@ -1629,6 +1409,7 @@ newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
 ```
 
 #improved map: DO NOT DELETE THIS MAP
+
 ```{r, eval=F}
 #Define the correct bivariate color palette
 bivariate_colors_corrected <- c(
@@ -1713,6 +1494,7 @@ ggplot(data, aes(x = Percent_Below_Poverty, y = predicted_no2)) +
 ```
 
 #Map of Predicted NO2 and poverty
+
 ```{r, eval=FALSE}
 # Normalize NO2 and Poverty levels to a 0–1 range
 newgrid_king_county <- newgrid_king_county %>%
@@ -1780,6 +1562,7 @@ ggplot() +
 ```
 
 #Linear regression of predicted NO2 and language diversity
+
 ```{r, eval=FALSE}
 
 # Load the dataset
@@ -2376,7 +2159,7 @@ pm_univar_res %>%
   )
 ```
 
-# Appendix 2: 
+# Appendix 2:
 
 ## Session information
 
@@ -2394,7 +2177,7 @@ sessionInfo()
 #-----code appendix-----
 ```
 
-## Functions defined 
+## Functions defined
 
 ```{r functions, eval = TRUE}
 #-----functions-----
