@@ -1,6 +1,6 @@
 ---
 title: "Examining Social Inequities in Traffic-Related Air Pollution Disparities in the Seattle Metropolitan Area Using Predictive Modeling"
-author: "Mariana Cortes Espinoza, Cecilia Martindale, Stephanie Mitchell, Jorge Rivera-Gonzalez, Katelin Teigen"
+author: "Mariana Cortes Espinosa, Cecilia Martindale, Stephanie Mitchell, Jorge Rivera-Gonzalez, Katelin Teigen"
 output: 
   html_document:
     df_print: "paged"
@@ -313,6 +313,16 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 ### Association Between Demographic Variables and Predicted Pollutants
 
+Multivariate equations:
+
+$$log(Predicted PM2.5) = \beta_0 + \beta_1 PercentBelow Poverty + \beta_2PercentEnglish Language Only + \beta_3PercentSpanish Language +\\ \beta_4PercentOther Language + \beta_5PercentWhite + \beta_6PercentBlack + \beta_7PercentAsian + \beta_8PercentAmericanIndianAlaskaNative +\\ \beta_9PercentHawaiianOrPacificIslander + \beta_{10}PercentHispanicOrLatino $$
+
+$$log(Predicted NO2) = \beta_0 + \beta_1 PercentBelow Poverty + \beta_2PercentEnglish Language Only + \beta_3PercentSpanish Language +\\ \beta_4PercentOther Language + \beta_5PercentWhite + \beta_6PercentBlack + \beta_7PercentAsian + \beta_8PercentAmericanIndianAlaskaNative +\\ \beta_9PercentHawaiianOrPacificIslander + \beta_{10}PercentHispanicOrLatino $$
+
+Univariate equations:
+
+$$log(pollutant) =\beta_0 + \beta_1SociodemographicVar $$
+
 # Results
 
 ## Summary Statistics
@@ -364,7 +374,7 @@ faceted_histogram <- ggplot(data = combined_data, aes(value)) +
   geom_histogram(colour = "black", fill = "white", bins = 30) +
   facet_grid(pollutant ~ scale, scales = "free_x") +
   labs(x = "Mean Values", y = "Frequency", title="Figure 1: Distribution of Mean Values",
-       caption="Distribution of native and log-transformed mean values of NO2 (above)\n and PM2.5 (below). Both variables are log-normally distributed.") + 
+       caption="Distribution of native and log-transformed mean values of NO2 (above)\n and PM2.5 (below) (n=8440 NO2 measurements, n=8638 PM2.5 measurements).\n Both variables are log-normally distributed.") + 
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5),
         plot.caption = element_text(hjust = 0.5)) +
@@ -393,7 +403,7 @@ annual_clean %>%
     Median = median(value)
   ) %>%
   rename(Pollutant = variable) %>% 
-  kable(caption = "Table 1: Descriptive statistics for Annual NO2 and PM2.5 Measurements Across Study Area Monitoring Locations (N = 304)", digits = 2) %>% 
+  kable(caption = "Table 1: Descriptive statistics for annual NO2 and PM2.5 mean concentrations across study area monitoring locations (N = 304)", digits = 2) %>% 
   kable_styling(full_width = FALSE, latex_options = c("hold_position")) %>% 
   add_footnote("Note: The mean of winsorized medians was used to summarize site annual averages.", # pulled wording from data dictionary 
                notation = "none", 
@@ -492,7 +502,7 @@ pm25_map_annual <- g +
 
 no2_map_annual + pm25_map_annual + plot_annotation(title = 'Figure 2: Map of Study Area Stop Concentrations',
   #subtitle = 'NO2 (left) and PM2.5 (right)',
-  caption = 'Both pollutants are presented on the native scale. \n NO2 is in ppb and PM2.5 is in ug/m3. This map captures the annual average concentrations\n stops at 304 monitoring locations.',
+  caption = 'This map captures the annual average concentrations of NO2 and PM2.5\n  at 304 monitoring locations. Both pollutants are presented on the native scale. \n NO2 is in ppb and PM2.5 is in ug/m3.',
   theme = theme(plot.title = element_text(face = "bold", hjust = 0.5),
                 plot.subtitle=element_text(hjust=0.5),
                 plot.caption=element_text(hjust=0.5)))
@@ -524,7 +534,7 @@ demo_summary <- acs_simplified %>%
 # Generate table
 demo_summary %>% 
   kable(
-    caption = "Table 2: Demographics All Census Tracts in Study Area. All demographics are presented as percents besides total population and number of census tracts.",
+    caption = "Table 2: Demographics of All Census Tracts in Study Area. All demographics are presented as percents besides total population and number of census tracts.",
     digits = 2
   ) %>%
   kable_styling()
@@ -580,7 +590,7 @@ v_annual.fit <- fit.variogram(v_annual, vgm(c("Exp", "Sph", "Mat")))
 
 # Display the selected variogram model and its parameters (sill, range, nugget)
 # Note: what model is selected? Spherical for both
-v_annual.fit
+#v_annual.fit
 
 # Plot the empirical variogram with the fitted model overlaid
 # consider expanding the x-axis here - moved to Appendix
@@ -593,8 +603,6 @@ v_annual.fit
 # 100000 is way too high a cutoff
 
 v_annual.uk <- variogram(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, data=annual_for_preds %>% filter(variable=="no2"))
-plot(v_annual.uk)
-
 
 # Fit the variogram model with multiple options (Exponential, Spherical, Matern)
 # note that this may have convergence issues. If so, you can try selecting one variogram model instead. You can also give it initial values for range, nugget etc. based on looking at the variogram cloud.
@@ -607,7 +615,7 @@ m_annual.uk <- fit.variogram(v_annual.uk, vgm(c("Exp", "Sph", "Mat")))
 
 
 # Display the selected variogram model parameters
-m_annual.uk
+#m_annual.uk
 
 ```
 
@@ -663,7 +671,7 @@ v.uk.pm25 <- variogram(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log
 m.uk.pm25 <- fit.variogram(v.uk.pm25, vgm(c("Exp", "Sph", "Mat")))
 
 # Display the selected variogram model parameters
-m.uk.pm25
+#m.uk.pm25
 
 # Plot the empirical variogram with the fitted model
 #plot(v.uk.pm25, model = m.uk.pm25)
@@ -891,7 +899,7 @@ pm25_uk_map <- ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10
 # Combine maps
 uk_map <- (no2_uk_map | pm25_uk_map) + 
   plot_annotation(
-    title = "Figure 3: Map of Study Area with UK NO2 and PM2.5 Predictions Overlaid as Points",
+    title = "Figure 3: Map of Study Area with UK\n NO2 and PM2.5 Predictions Overlaid as Points",
     theme = theme(
       plot.title = element_text(size = 14, face = "bold", hjust = 0.5, margin = margin(b = 20))
     )
@@ -1070,7 +1078,7 @@ pm_full_results %>%
     `95%CI High` = conf.high
   ) %>% 
   kable(
-    caption = "Table 5: Regression for Association Results for PM2.5 Model. Response variable was log(PM2.5), and all results have been exponentiated.",
+    caption = "Table 5: Regression for Association Results for PM2.5 Model. Response variable was log(PM2.5), and all results have been exponentiated. Multiple R-squared was 0.168, RSE was 0.103, F-statistic was 3.613, p=0.0002.",
     digits = 3, 
     col.names = c("Term", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
   ) %>%
@@ -1189,7 +1197,7 @@ no2_full_results %>%
     `95%CI High` = conf.high
   ) %>% 
   kable(
-    caption = "Table 6: Regression for Association Results for NO2 Model. Response variable was log(NO2), and all results have been exponentiated.",
+    caption = "Table 6: Regression for Association Results for NO2 Model. Response variable was log(NO2), and all results have been exponentiated. Multiple R-squared was 0.238, RSE was 0.206, F-statistic was 5.574, p<0.0001.",
     digits = 3, 
     col.names = c("Term", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
   ) %>%
@@ -2051,6 +2059,9 @@ no2_map_stop + pm25_map_stop + plot_annotation(title = 'Map of Study Area Stop C
 #   theme(legend.position = "none")
 
 plot(v_annual, v_annual.fit, main="Empirical Variogram with Fitted Model Overlaid: NO2")
+
+v_annual.fit
+m_annual.uk
 ```
 
 ```{r grid.UK.preds.logNO2}
@@ -2073,6 +2084,9 @@ pl4 <- plot(ln.NO2.block.kr["se"], main = "UK Prediction Error PM2.5\n (Standard
 #plot(v.uk.pm25, main="Estimated Variogram for log(PM2.5)")
 
 plot(v.uk.pm25, model = m.uk.pm25, main="Estimated Variogram for log(PM2.5) with Fitted Variogram")
+
+# Display the selected variogram model parameters
+m.uk.pm25
 ```
 
 ```{r UK.preds.logPM25}
