@@ -228,7 +228,8 @@ census_blocks_covar_clean <- census_blocks_covar %>%
   mutate(log_m_to_a1 = log(m_to_a1+1), log_m_to_a2=log(m_to_a2+1), log_m_to_a3=log(m_to_a3+1),
          log_m_to_coast=log(m_to_coast+1), log_m_to_l_airp=log(m_to_l_airp+1), 
          log_m_to_comm=log(m_to_comm+1)) %>% 
-  select(-c(m_to_a1,m_to_a2,m_to_a3,m_to_coast,m_to_l_airp,m_to_comm))
+  select(-c(m_to_a1,m_to_a2,m_to_a3,m_to_coast,m_to_l_airp,m_to_comm)) %>%
+  filter(tract_key %in% mobile_covar_clean$tract_key)
 
 ```
 
