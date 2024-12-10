@@ -1,18 +1,28 @@
-
 ---
-title: "Final Project Script"
+title: "Examining Social Inequities in Traffic-Related Air Pollution Disparities in the Seattle Metropolitan Area Using Predictive Modeling"
+author: "Mariana Cortes Espinoza, Cecilia Martindale, Stephanie Mitchell, Jorge Rivera-Gonzalez, Katelin Teigen"
 output: 
   html_document:
+    df_print: "paged"
+    fig_caption: yes
     toc: true
     toc_float: true
     toc_collapsed: true
 toc_depth: 3
-date: "2024-11-21"
+date: "2024-12-10"
+execute:
+  echo: true
+  warning: false
+  cache: false
+  message: false
 editor_options: 
   chunk_output_type: console
 ---
 
-# Set-up and load data
+# Background
+
+Insert intro here
+
 ```{r setup}
 # Clear workspace of all objects and unload non-base packages
 rm(list = ls(all = TRUE))
@@ -87,12 +97,6 @@ acs_poverty <- read_csv("ACS19_poverty.csv")
 
 census_blocks_covar <- read_csv("wa_block_covar_clean.csv")
 ```
-
-# Clean data
-
-We selected only NO2 (no2) and PM2.5 (neph_bscat) variables from the stop data and the annual data. We obtained Census shapefile data from the Census Bureau's website for Washington, and only kept those within King, Snohomish, Pierce, and Kitsap counties (*might not need Kitsap but I didn't want to open the map to check*). We linked data using the 6-digit tract code.
-
-Prior to log-transforming covariates, we added 1 to each variable.
 
 ```{r data.cleaning}
 # annual data
@@ -233,7 +237,6 @@ census_blocks_covar_clean <- census_blocks_covar %>%
 
 ```
 
-#ACS data merge: The goal with this merge is to create 1 CSV for us to work with all relevant ACS data for our project 
 ```{r merge.acs.files}
 #--------------Steph & Jorge edits Nov 30
 # merge and clean language, race, ethnicity and poverty datasets
@@ -268,12 +271,6 @@ acs_simplified <- acs_combined %>%
 
 ```
 
-## Variables to include:
-Mercer et al vars + airp: D2A1, A1_50, A23_400, Pop_5000, D2C, Int_3000, D2Comm, D2Airp
-
-What we included from grid and mobile covars: m_to_a1, m_to_a2, m_to_a3, pop_s05000, m_to_coast, m_to_l_airp, m_to_comm,lu_industrial_p03000
-
-ACS vars
 ```{r merge.stop.and.acs.data}
 # create stop data with land use vars and ACS (for descriptive tables)
 # merge locations on location var variable (stop_clean) and native_id variable (mobile_covar)
@@ -321,243 +318,24 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 ```
 
+# Methods
 
-# Descriptive statistics
+## Data Description
 
-## Descriptive statistics for stop data
+## Data Cleaning and Exploration
 
-```{r desc.stats.stop.data}
+## Statistical Analysis
 
-stop_clean %>% 
-  mutate(variable = case_when(
-    variable == "neph_bscat" ~ "PM2.5 (ug/m3)",
-    variable == "no2" ~ "NO2 (ppb)",
-    TRUE ~ variable
-  )) %>%
-  group_by(variable) %>% 
-  summarise(
-    N = n(),
-    "Arithmetic Mean" = mean(mean_value),
-    "SD" = sd(mean_value),
-    "Geometric Mean" = exp(mean(log(mean_value), na.rm = TRUE)),
-    "Geometric SD" = exp(sd(log(mean_value), na.rm = TRUE)),
-    Max = max(mean_value),
-    Min = min(mean_value),
-    Median = median(median_value)
-  ) %>%
-  rename(Pollutant = variable) %>% 
-  kable(caption = "Table 1: Descriptive statistics for NO2 and PM2.5 for Study Area", digits = 2) %>% 
-  kable_styling()
+### Summary Statistics
 
-# I tried incorporating log-transformed values as well, but I think this may be unnecessary if we present the geo mean and SD in the above table. Plus, we can follow up Table 2 with Figure 1 of the distributions to visualize the need for log-transformation. -kt
+### Prediction Models
 
-# table1 <- stop_clean %>% 
-#   mutate(
-#     variable = case_when(
-#       variable == "neph_bscat" ~ "PM2.5 (ug/m3)",
-#       variable == "no2" ~ "NO2 (ppb)",
-#       TRUE ~ variable
-#     ),
-#     log_variable = paste0("log(", variable, ")"),
-#     log_value = log(mean_value) 
-#   ) %>%
-#   pivot_longer(
-#     cols = c(mean_value, log_value),
-#     names_to = "value_type",
-#     values_to = "value"
-#   ) %>%
-#   mutate(
-#     variable_type = case_when(
-#       value_type == "mean_value" ~ variable,
-#       value_type == "log_value" ~ log_variable
-#     )
-#   ) %>%
-#   group_by(variable_type) %>% 
-#   summarise(
-#     N = n(),
-#     Mean = mean(value, na.rm = TRUE),
-#     SD = sd(value, na.rm = TRUE),
-#     Max = max(value, na.rm = TRUE),
-#     Min = min(value, na.rm = TRUE),
-#     Median = median(value, na.rm = TRUE)
-#   ) %>%
-#   rename(Pollutant = variable_type) %>% 
-#   kable(caption = "Table 2: Descriptive statistics for NO2, PM2.5, and their log-transformed values", digits = 2) %>% 
-#   kable_styling()
-# 
-# table1
+### Association Between Demographic Variables and Predicted Pollutants
 
-```
+# Results
 
-## Descriptive statistics for annual data
+## Summary Statistics
 
-Also very basic at the moment.
-```{r desc.stats.annual.data}
-
-annual_clean %>% 
-  mutate(variable = case_when(
-    variable == "pm2.5_ug_m3" ~ "PM2.5 (ug/m3)",
-    variable == "no2" ~ "NO2 (ppb)",
-    TRUE ~ variable
-  )) %>%
-  group_by(variable) %>% 
-  summarise(
-  #  N = n(),
-    "Arithmetic Mean" = mean(value),
-    "SD" = sd(value),
-    "Geometric Mean" = exp(mean(log(value), na.rm = TRUE)),
-    "Geometric SD" = exp(sd(log(value), na.rm = TRUE)),
-    Max = max(value),
-    Min = min(value),
-    Median = median(value)
-  ) %>%
-  rename(Pollutant = variable) %>% 
-  kable(caption = "Table 2: Descriptive statistics for Annual NO2 and PM2.5 Measurements Across Study Area Monitoring Locations (N = 304)", digits = 2) %>% 
-  kable_styling(full_width = FALSE, latex_options = c("hold_position")) %>% 
-  add_footnote("Note: The mean of winsorized medians was used to summarize site annual averages.", # pulled wording from data dictionary 
-               notation = "none", 
-               threeparttable = TRUE)
-
-```
-
-
-## Descriptive stats for census data
-
-**Table 3** describes the demographic data for the study area by county. 
-
-```{r demographics.table}
-
-# County-level summary
-county_summary <- acs_simplified %>% 
-  filter(tract_key %in% unique(stop_w_acs$tract_key)) %>% 
-  mutate(County = case_when(
-    str_detect(NAME, "King") ~ "King County",
-    str_detect(NAME, "Snohomish") ~ "Snohomish County",
-    str_detect(NAME, "Pierce") ~ "Pierce County"
-  )) %>% 
-  group_by(County) %>%
-  summarise(
-    `Total Pop. (N)` = sum(Total_Pop),
-    `Census Tracts`=length(unique(tract_key)),
-    White = mean(White / Total_Pop) * 100,
-    `Black or African-American` = mean(Black_AfricanAmerican / Total_Pop) * 100,
-    `American Indian or Alaska Native` = mean(AIAN / Total_Pop) * 100,
-    Asian = mean(Asian / Total_Pop) * 100,
-    `Hawaiian or Pacific Islander` = mean(Hawaiian_PacificIslander / Total_Pop) * 100,
-    `Hispanic or Latino` = mean(HispanicorLatino / Total_Pop) * 100,
-    `Percent Below Poverty` = mean(Percent_Below_Poverty),
-    `SD Percent Below Poverty` = sd(Percent_Below_Poverty),
-    `English only` = mean(English_only / Total_Pop) * 100,
-    `Language other than English` = mean(Language_other_than_English / Total_Pop) * 100,
-    Spanish = mean(Spanish / Total_Pop) * 100,
-    `Other language` = mean(Other / Total_Pop) * 100
-  )
-
-# Total row calculation
-total_row <- acs_simplified %>%
-  filter(tract_key %in% unique(stop_w_acs$tract_key)) %>%
-  summarise(
-    County = "Total",
-    `Total Pop. (N)` = sum(Total_Pop),
-    `Census Tracts`=length(unique(tract_key)),
-    White = mean(White / Total_Pop) * 100,
-    `Black or African-American` = mean(Black_AfricanAmerican / Total_Pop) * 100,
-    `American Indian or Alaska Native` = mean(AIAN / Total_Pop) * 100,
-    Asian = mean(Asian / Total_Pop) * 100,
-    `Hawaiian or Pacific Islander` = mean(Hawaiian_PacificIslander / Total_Pop) * 100,
-    `Hispanic or Latino` = mean(HispanicorLatino / Total_Pop) * 100,
-    `Percent Below Poverty` = mean(Percent_Below_Poverty),
-    `SD Percent Below Poverty` = NA, # SD is not meaningful across aggregated data
-    `English only` = mean(English_only / Total_Pop) * 100,
-    `Language other than English` = mean(Language_other_than_English / Total_Pop) * 100,
-    Spanish = mean(Spanish / Total_Pop) * 100,
-    `Other language` = mean(Other / Total_Pop) * 100
-  )
-
-# Combine county summaries with the total row
-table1 <- bind_rows(county_summary, total_row)
-
-# Generate table
-table1 %>% 
-  kable(
-    caption = "Table 2: Demographics by County for All Census Tracts included in study. All demographics are presented as percents besides total population and number of census tracts.",
-    digits = 2
-  ) %>%
-  kable_styling()
-
-```
-
-```{r, eval=FALSE}
-# This dot plot is misleading and confusing - what does income of 20 mean? The percentages are confusing and this information would be easier to understand in a table.
-
-# Improved dot plot with ggplot2 color schemes
-ggplot(dot_plot_data, aes(x = Value, y = Category, color = Type, shape = Type)) +
-  geom_point(size = 4) +
-  geom_vline(xintercept = seq(0, 60, 10), linetype = "dotted", color = "gray80") +
-  labs(
-    title = "Cohort Demographics, Language Usage, and Income\n Below Poverty Level",
-    x = "Value (Percentage or Metric Value)",
-    y = "Category",
-    color = "Type",
-    shape = "Type"
-  ) +
-  scale_color_manual(values = c("#F8766D", "#00BA38", "#619CFF")) + # ggplot2-friendly colors
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    axis.text.x = element_text(size = 10),
-    axis.text.y = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank()
-  )
-
-
-```
-
-```{r, eval=FALSE}
-#---------------------- Exploring pollutant data with language
-
-# Load your dataset
-stop_w_acs <- read.csv("stop_w_acs.csv")
-
-# Pivot the racial demographic columns to long format
-race_columns <- c(
-  "White", "Black_AfricanAmerican", "AIAN", "Asian", 
-  "Hawaiian_PacificIslander", "HispanicorLatino", "Other_alone"
-)
-
-stop_w_acs_race_long <- stop_w_acs %>%
-  pivot_longer(
-    cols = all_of(race_columns), # Use the racial demographic columns
-    names_to = "Race",
-    values_to = "Population"
-  )
-
-# Create the boxplot with a color-blind-friendly palette
-ggplot(stop_w_acs_race_long, aes(x = Race, y = mean_value, fill = variable)) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.8) +
-  scale_fill_manual(values = c("#D55E00", "#0072B2", "#009E73", "#F0E442")) + # Color-blind-friendly palette
-  theme_minimal() +
-  labs(
-    title = "Air Pollutant Distribution by Race",
-    x = "Race",
-    y = "Mean Pollutant Value",
-    fill = "Pollutant"
-  ) +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-## This plot doesn't make much sense - it looks like each stop has every Race category, so when you plot the values, they're all the same. I don't think it makes sense to plot every stop by race, because stops don't have a race. (Cecilia)
-```
-
-## Summary and visualizations of air pollutant data
-Comparing the distribution of the mean values of NO2 and PM2.5 on the native and log scales. Based on these histograms, it looks like we should log transform both variables for subsequent analyses. 
 ```{r var.distributions}
 
 #---- Means ----
@@ -615,12 +393,32 @@ faceted_histogram <- ggplot(data = combined_data, aes(value)) +
 print(faceted_histogram)
 ```
 
+```{r desc.stats.annual.data}
+annual_clean %>% 
+  mutate(variable = case_when(
+    variable == "pm2.5_ug_m3" ~ "PM2.5 (ug/m3)",
+    variable == "no2" ~ "NO2 (ppb)",
+    TRUE ~ variable
+  )) %>%
+  group_by(variable) %>% 
+  summarise(
+  #  N = n(),
+    "Arithmetic Mean" = mean(value),
+    "SD" = sd(value),
+    "Geometric Mean" = exp(mean(log(value), na.rm = TRUE)),
+    "Geometric SD" = exp(sd(log(value), na.rm = TRUE)),
+    Max = max(value),
+    Min = min(value),
+    Median = median(value)
+  ) %>%
+  rename(Pollutant = variable) %>% 
+  kable(caption = "Table 1: Descriptive statistics for Annual NO2 and PM2.5 Measurements Across Study Area Monitoring Locations (N = 304)", digits = 2) %>% 
+  kable_styling(full_width = FALSE, latex_options = c("hold_position")) %>% 
+  add_footnote("Note: The mean of winsorized medians was used to summarize site annual averages.", # pulled wording from data dictionary 
+               notation = "none", 
+               threeparttable = TRUE)
 
-# Prediction model components
-
-## Variograms
-
-These work best for the annual data, so we are using the annual data to make our predictions.
+```
 
 ```{r set.up.sf.data, include=FALSE}
 
@@ -721,6 +519,40 @@ no2_map_annual + pm25_map_annual + plot_annotation(title = 'Figure 2: Map of Stu
 
 ```
 
+```{r demographics.table}
+
+# Demographics table for study area
+demo_summary <- acs_simplified %>% 
+  filter(tract_key %in% unique(stop_w_acs$tract_key)) %>% 
+  summarise(
+    `Total Pop. (N)` = sum(Total_Pop),
+    `Census Tracts`=length(unique(tract_key)),
+    White = mean(White / Total_Pop) * 100,
+    `Black or African-American` = mean(Black_AfricanAmerican / Total_Pop) * 100,
+    `American Indian or Alaska Native` = mean(AIAN / Total_Pop) * 100,
+    Asian = mean(Asian / Total_Pop) * 100,
+    `Hawaiian or Pacific Islander` = mean(Hawaiian_PacificIslander / Total_Pop) * 100,
+    `Hispanic or Latino` = mean(HispanicorLatino / Total_Pop) * 100,
+    `Percent Below Poverty` = mean(Percent_Below_Poverty),
+    `SD Percent Below Poverty` = sd(Percent_Below_Poverty),
+    `English only` = mean(English_only / Total_Pop) * 100,
+    `Language other than English` = mean(Language_other_than_English / Total_Pop) * 100,
+    Spanish = mean(Spanish / Total_Pop) * 100,
+    `Other language` = mean(Other / Total_Pop) * 100
+  )
+
+# Generate table
+demo_summary %>% 
+  kable(
+    caption = "Table 2: Demographics All Census Tracts in Study Area. All demographics are presented as percents besides total population and number of census tracts.",
+    digits = 2
+  ) %>%
+  kable_styling()
+
+```
+
+## Prediction model results
+
 ```{r}
 # Convert to a meter CRS for distance calculations
 stop_for_preds <- st_transform(stop_for_preds, crs = lambert_proj) 
@@ -728,7 +560,6 @@ stop_for_preds <- st_transform(stop_for_preds, crs = lambert_proj)
 annual_for_preds <- st_transform(annual_for_preds, crs = lambert_proj) 
 ```
 
-Note: log_mean ~ 1 is Ordinary Kriging -- since we are doing Universal Kriging we need to include our covariates in the formulas.
 ```{r no2.variograms}
 # ---- Empirical Variogram Plots ----
 
@@ -800,9 +631,6 @@ m_annual.uk
 
 ```
 
-## Predict with Universal Kriging 
-This code was taken from the Week 6 Lab, and we need to predict on the grid level (for mapping) and the block level (for testing associations, as the grid can underpredict). We can try just mapping with the block level too.
-
 ```{r universal.kriging.prediction.no2.grid.annual, warning=FALSE}
 #transform stop data to Lambert for distances 
 grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
@@ -822,8 +650,6 @@ ln.no2.kr$se <- sqrt(ln.no2.kr$var1.var)  # Standard error is the square root of
 
 #plotting these in Appendix
 ```
-
-Tried to let universal kriging on the stop data run for 30 min, but got nothing - let's chalk this up to limited computational power.
 
 ```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE}
 #transform stop data to Lambert for distances 
@@ -898,8 +724,6 @@ ln.PM25.kr$se <- sqrt(ln.PM25.kr$var1.var)  # Standard error is the square root 
 
 ```
 
-## Cross-validation of NO2 and PM2.5 universal kriging models
-
 ```{r define CV functions}
 # ---- Define Cross-Validation Functions ----
 
@@ -962,17 +786,17 @@ cv5uk_no2 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log
                  model = m_annual.uk,
                  nfold = 5)
 
-# Perform Universal Kriging (UK) with Leave-One-Out Cross-Validation (LOOCV)
-cvLOOuk_no2 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+# Perform Universal Kriging (UK) with 10-fold Cross-Validation
+cv10uk_no2 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
                  annual_for_preds %>% filter(variable=="no2"), 
-                 model = m_annual.uk
-                     )
+                 model = m_annual.uk,
+                 nfold = 10)
 
 # Calculate and compare performance statistics across cross-validation methods
 # Compile results into a summary table
 bind_rows(
   krige.cv.stats(cv5uk_no2, "UK: 5-Fold CV NO2"),
-  krige.cv.stats(cvLOOuk_no2, "UK: LOO CV NO2")
+  krige.cv.stats(cv10uk_no2, "UK: 10-Fold CV NO2")
 ) %>% 
   kable(caption = "Summary of Kriging Cross-Validation Results for log(NO2)") %>% kable_styling()
 
@@ -987,23 +811,22 @@ cv5uk_pm25 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + lo
                  model = m.uk.pm25,
                  nfold = 5)
 
-# Perform Universal Kriging (UK) with Leave-One-Out Cross-Validation (LOOCV)
-cvLOOuk_pm25 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
+# Perform Universal Kriging (UK) with 10-fold Cross-Validation (LOOCV)
+cv10uk_pm25 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm + pop10_s05000 + lu_industrial_p03000, 
                  annual_for_preds %>% filter(variable=="pm2.5_ug_m3"), 
-                 model = m.uk.pm25
-                     )
+                 model = m.uk.pm25,
+                 nfold = 10)
 
 # Calculate and compare performance statistics across cross-validation methods
 # Compile results into a summary table
 bind_rows(
   krige.cv.stats(cv5uk_pm25, "UK: 5-Fold CV PM2.5"),
-  krige.cv.stats(cvLOOuk_pm25, "UK: LOO CV PM2.5")
+  krige.cv.stats(cv10uk_pm25, "UK: 10-Fold CV PM2.5")
 ) %>% 
   kable(caption = "Summary of Kriging Cross-Validation Results for log(PM2.5)") %>% kable_styling()
 
 ```
 
-### Mapping predicted pollutants on native scale
 ```{r map.native.scale}
 
 # exponentiate log vars
@@ -1044,9 +867,10 @@ ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) +
   geom_sf(data = new_blocks_no2, aes(color = `NO2 (ppb)`), alpha = 0.05) +
   # color friendly color scale
   scale_color_viridis_c(option = "plasma") + 
-  ggtitle("Map of Seattle Area with UK NO2 Predictions Overlaid as Points") +
+  ggtitle("Map of Seattle Area with UK NO2\n Predictions Overlaid as Points") +
   ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
-  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering)
+  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering) +
+
 
 #PM2.5 - native scale
 ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) + 
@@ -1054,7 +878,7 @@ ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) +
   geom_sf(data = new_blocks_pm25, aes(color = `PM2.5 (ug/m^3)`), alpha = 0.05) +
   # color friendly color scale
   scale_color_viridis_c(option = "plasma") + 
-  ggtitle("Map of Seattle Area with UK PM2.5 Predictions Overlaid as Points") + ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
+  ggtitle("Map of Seattle Area with UK PM2.5\n Predictions Overlaid as Points") + ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
   ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering)
 ```
 
@@ -1074,13 +898,38 @@ full_data_w_preds <- acs_simplified %>% left_join(predicted_to_tracts_no2, join_
   filter(!is.na(`ln(NO2) ln(ppb)`) | !is.na(`ln(PM2.5) ln(ug/m^3)`))
 ```
 
-# Important note about the full data
+```{r desc.stats.pred.data}
+
+full_data_w_preds %>% 
+  pivot_longer(cols=contains(c("NO2", "PM2.5")),
+               names_to = "variable") %>%
+  filter(variable == "NO2 (ppb)" | variable == "PM2.5 (ug/m^3)") %>%
+  group_by(variable) %>% 
+  summarise(
+    #"Census tracts" = n(),
+    "Arithmetic Mean" = mean(value),
+    "SD" = sd(value),
+    "Geometric Mean" = exp(mean(log(value), na.rm = TRUE)),
+    "Geometric SD" = exp(sd(log(value), na.rm = TRUE)),
+    Max = max(value),
+    Min = min(value),
+    Median = median(value)
+  ) %>%
+  kable(caption = "Table X: Descriptive statistics for predicted NO2 and PM2.5 annual means in study area (n=452 census tracts).", digits = 2) %>% 
+  kable_styling(full_width = FALSE, latex_options = c("hold_position")) %>% 
+  add_footnote("Note: The mean of winsorized medians was used to summarize site annual averages.", # pulled wording from data dictionary 
+               notation = "none", 
+               threeparttable = TRUE)
+
+```
+
+## Important note about the full data
 
 **IMPORTANT**: FULL DATA containing the predicted NO2, predicted PM2.5, and ACS variables is located in the dataframe called "full_data_w_preds". This is the dataframe we should use to do our association tests. If there are variables in other acs sets you can sub that in in the line of code above as long as they still have "tract_key" -- otherwise you'll need to do a little more.
 
-# Research Question 3: Association between Pollutant Concentrations & Demographics
+## Associations Between Pollutant Concentrations & Demographics
 
-```{r q3.univariate.reg.assoc}
+```{r q3.univariate.reg.assoc.pm25}
 # Regression between annual PM2.5 concentrations and various demographics
 
 # Created new columns for percent of population for each race (same as those included in demographic statistics summary table (except for "Other Langugage"))
@@ -1166,43 +1015,6 @@ pm_univar_res <- rbind(pm_poverty_res,pm_white_res,pm_BlackAA_res,pm_AIAN_res,
   filter(term!="(Intercept)") %>%
   relocate(intercept, .before=estimate)
 
-# Formatted table for regression results
-pm_univar_res %>%
-  select(term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>% 
-  mutate(
-    Term = case_when(
-      term == "Percent_Below_Poverty" ~ "% Below Poverty",
-      term == "p_engl_only" ~ "% English Language Only",
-      term == "p_lang_other" ~ "% Other Language",
-      term == "p_spanish" ~ "% Spanish Language",
-      term == "p_White" ~ "% White",
-      term == "p_BlackAA" ~ "% Black or African American",
-      term == "p_AIAN" ~ "% American Indian or Alaska Native",
-      term == "p_Asian" ~ "% Asian",
-      term == "p_HPI" ~ "% Hawaiian or Pacific Islander",
-      term == "p_Hispanic" ~ "% Hispanic or Latino",
-      TRUE ~ term 
-    )
-  ) %>%
-  select(Term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>%
-  rename(
-    Estimate = estimate,
-    Intercept = intercept,
-    `Std. Error` = std.error,
-    `t-value` = statistic,
-    `P-value` = p.value,
-    `95%CI Low` = conf.low,
-    `95%CI High` = conf.high
-  ) %>% 
-  kable(
-    caption = "Table: Univariate Regression for Association Results for PM2.5 Model. Response variable was log(PM2.5), and all results have been exponentiated. Each row represents a separate univariate regression model, with the Term as the predictor variable.",
-    digits = 3, 
-    col.names = c("Term", "Intercept", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
-  ) %>%
-  kable_styling(
-    full_width = FALSE, 
-    bootstrap_options = c("striped", "hover", "condensed")
-  )
 ```
 
 ```{r q3.multivariate.reg.assoc.pm25}
@@ -1252,152 +1064,78 @@ pm_full_results %>%
 
 ```
 
-Below still needs to be fixed (full one is fixed though).
-```{r}
-## Again, I think all of these need to be edited (the predictor and response variables are switched) -kt
-# Associations between annual NO2 concentrations and various demographics
-
-# NO2 x poverty
-no2_poverty <- lm(Percent_Below_Poverty ~ `NO2 (ppb)`, 
-                 data = full_data_w_preds)
-           
-# PM2.5 x White
-no2_white <- lm(p_White ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-# PM2.5 x Black African American
-no2_BlackAA <- lm(p_BlackAA ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-# PM2.5 x Black African American
-no2_AIAN <- lm(p_AIAN ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-# PM2.5 x Black African American
-no2_Asian <- lm(p_Asian ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-# PM2.5 x Black African American
-no2_HPI <- lm(p_HPI ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-# PM2.5 x Black African American
-no2_Hispanic <- lm(p_Hispanic ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-# PM2.5 x Black African American
-no2_engl_only <- lm(p_engl_only ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-no2_lang_other <- lm(p_lang_other ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-
-no2_spanish <- lm(p_spanish ~ `NO2 (ppb)`, data = full_data_w_preds_perc)
-```
-
-```{r q3.univariate.reg.assoc.no2, eval=FALSE}
+```{r q3.univariate.reg.assoc.no2}
 # Regression between annual PM2.5 concentrations and various demographics
 
 # Created new columns for percent of population for each race (same as those included in demographic statistics summary table (except for "Other Langugage"))
 
 ## I think all of these need to be edited (the predictor and response variables are switched) -kt
 ## Edited - cm
-#PM2.5 x poverty
-pm_poverty <- lm(`ln(NO2) ln(ppb)` ~ Percent_Below_Poverty, 
+#NO2 x poverty
+no2_poverty <- lm(`ln(NO2) ln(ppb)` ~ Percent_Below_Poverty, 
                  data = full_data_w_preds)
-pm_poverty_res <- tidy(pm_poverty, conf.int=TRUE, exponentiate=TRUE) %>%
+no2_poverty_res <- tidy(no2_poverty, conf.int=TRUE, exponentiate=TRUE) %>%
   mutate(intercept=case_when(term=="Percent_Below_Poverty" ~ 6.86,
                              .default=NA))
            
 # PM2.5 x White
-pm_white <- lm(`ln(NO2) ln(ppb)` ~ p_White, data = full_data_w_preds_perc)
-pm_white_res <- tidy(pm_white, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_White" ~ 4.40,
+no2_white <- lm(`ln(NO2) ln(ppb)` ~ p_White, data = full_data_w_preds_perc)
+no2_white_res <- tidy(no2_white, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_White" ~ 7.95,
                              .default=NA))
 
 # PM2.5 x Black African American
-pm_BlackAA <- lm(`ln(NO2) ln(ppb)` ~ p_BlackAA, data = full_data_w_preds_perc)
-pm_BlackAA_res <- tidy(pm_BlackAA, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_BlackAA" ~ 4.31,
+no2_BlackAA <- lm(`ln(NO2) ln(ppb)` ~ p_BlackAA, data = full_data_w_preds_perc)
+no2_BlackAA_res <- tidy(no2_BlackAA, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_BlackAA" ~ 7.40,
                              .default=NA))
 
 # PM2.5 x AIAN
-pm_AIAN <- lm(`ln(NO2) ln(ppb)` ~ p_AIAN, data = full_data_w_preds_perc)
-pm_AIAN_res <- tidy(pm_AIAN, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_AIAN" ~ 4.40,
+no2_AIAN <- lm(`ln(NO2) ln(ppb)` ~ p_AIAN, data = full_data_w_preds_perc)
+no2_AIAN_res <- tidy(no2_AIAN, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_AIAN" ~ 7.81,
                              .default=NA))
 
 # PM2.5 x Asian
-pm_Asian <- lm(`ln(NO2) ln(ppb)` ~ p_Asian, data = full_data_w_preds_perc)
-pm_Asian_res <- tidy(pm_Asian, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_Asian" ~ 4.39,
+no2_Asian <- lm(`ln(NO2) ln(ppb)` ~ p_Asian, data = full_data_w_preds_perc)
+no2_Asian_res <- tidy(no2_Asian, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_Asian" ~ 7.77,
                              .default=NA))
 
 # PM2.5 x HPI
-pm_HPI <- lm(`ln(NO2) ln(ppb)` ~ p_HPI, data = full_data_w_preds_perc)
-pm_HPI_res <- tidy(pm_HPI, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_HPI" ~ 4.38,
+no2_HPI <- lm(`ln(NO2) ln(ppb)` ~ p_HPI, data = full_data_w_preds_perc)
+no2_HPI_res <- tidy(no2_HPI, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_HPI" ~ 7.74,
                              .default=NA))
 
 # PM2.5 x Hispanic
-pm_Hispanic <- lm(`ln(NO2) ln(ppb)` ~ p_Hispanic, data = full_data_w_preds_perc)
-pm_Hispanic_res <- tidy(pm_Hispanic, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_Hispanic" ~ 4.36,
+no2_Hispanic <- lm(`ln(NO2) ln(ppb)` ~ p_Hispanic, data = full_data_w_preds_perc)
+no2_Hispanic_res <- tidy(no2_Hispanic, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_Hispanic" ~ 7.62,
                              .default=NA))
 
 # PM2.5 x language
-pm_engl_only <- lm(`ln(NO2) ln(ppb)` ~ p_engl_only, data = full_data_w_preds_perc)
-pm_engl_only_res <- tidy(pm_engl_only, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_engl_only" ~ 4.38,
+no2_engl_only <- lm(`ln(NO2) ln(ppb)` ~ p_engl_only, data = full_data_w_preds_perc)
+no2_engl_only_res <- tidy(no2_engl_only, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_engl_only" ~ 7.79,
                              .default=NA))
 
-pm_lang_other <- lm(`ln(NO2) ln(ppb)` ~ p_lang_other, data = full_data_w_preds_perc)
-pm_lang_other_res <- tidy(pm_lang_other, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_lang_other" ~ 4.38,
+no2_lang_other <- lm(`ln(NO2) ln(ppb)` ~ p_lang_other, data = full_data_w_preds_perc)
+no2_lang_other_res <- tidy(no2_lang_other, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_lang_other" ~ 7.74,
                              .default=NA))
 
-pm_spanish <- lm(`ln(NO2) ln(ppb)` ~ p_spanish, data = full_data_w_preds_perc)
-pm_spanish_res <- tidy(pm_spanish, conf.int=TRUE, exponentiate=TRUE) %>%
-  mutate(intercept=case_when(term=="p_spanish" ~ 4.36,
+no2_spanish <- lm(`ln(NO2) ln(ppb)` ~ p_spanish, data = full_data_w_preds_perc)
+no2_spanish_res <- tidy(no2_spanish, conf.int=TRUE, exponentiate=TRUE) %>%
+  mutate(intercept=case_when(term=="p_spanish" ~ 7.63,
                              .default=NA))
   
-pm_univar_res <- rbind(pm_poverty_res,pm_white_res,pm_BlackAA_res,pm_AIAN_res,
-                       pm_Asian_res, pm_HPI_res, pm_Hispanic_res, pm_engl_only_res,
-                       pm_lang_other_res,pm_spanish_res) %>% 
+no2_univar_res <- rbind(no2_poverty_res, no2_white_res, no2_BlackAA_res, no2_AIAN_res,
+                       no2_Asian_res, no2_HPI_res, no2_Hispanic_res, no2_engl_only_res,
+                       no2_lang_other_res, no2_spanish_res) %>% 
   filter(term!="(Intercept)") %>%
   relocate(intercept, .before=estimate)
-
-# Formatted table for regression results
-pm_univar_res %>%
-  select(term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>% 
-  mutate(
-    Term = case_when(
-      term == "Percent_Below_Poverty" ~ "% Below Poverty",
-      term == "p_engl_only" ~ "% English Language Only",
-      term == "p_lang_other" ~ "% Other Language",
-      term == "p_spanish" ~ "% Spanish Language",
-      term == "p_White" ~ "% White",
-      term == "p_BlackAA" ~ "% Black or African American",
-      term == "p_AIAN" ~ "% American Indian or Alaska Native",
-      term == "p_Asian" ~ "% Asian",
-      term == "p_HPI" ~ "% Hawaiian or Pacific Islander",
-      term == "p_Hispanic" ~ "% Hispanic or Latino",
-      TRUE ~ term 
-    )
-  ) %>%
-  select(Term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>%
-  rename(
-    Estimate = estimate,
-    Intercept = intercept,
-    `Std. Error` = std.error,
-    `t-value` = statistic,
-    `P-value` = p.value,
-    `95%CI Low` = conf.low,
-    `95%CI High` = conf.high
-  ) %>% 
-  kable(
-    caption = "Table: Univariate Regression for Association Results for PM2.5 Model. Response variable was log(NO2), and all results have been exponentiated. Each row represents a separate univariate regression model, with the Term as the predictor variable.",
-    digits = 3, 
-    col.names = c("Term", "Intercept", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
-  ) %>%
-  kable_styling(
-    full_width = FALSE, 
-    bootstrap_options = c("striped", "hover", "condensed")
-  )
 ```
-
 
 ```{r q3.multivariate.reg.assoc.no2}
 # Multiple linear regression model for NO2
@@ -1445,7 +1183,7 @@ no2_full_results %>%
   )
 ```
 
-# Choropleth visualization of predicted pollutants with demographic variables
+## Choropleth visualization of predicted pollutants with demographic variables
 
 ```{r pm25.choropleth.map}
 ## The below code to merge the full dataset with the census geometries is kinda trash. Would love your expertise in cleaning it up Cecilia :-D
@@ -1694,7 +1432,6 @@ combined_pm_choropleth <- (combined_pm_choropleth | wrap_elements(common_legend)
 print(combined_pm_choropleth)
 ```
 
-
 ```{r no2.choropleth.map}
 ## generating plots for significant predictors from regression results
 
@@ -1849,83 +1586,6 @@ print(combined_no2_choropleth)
 
 ```
 
-
-# Trying to answer questions
-
-Percent below poverty and pollutant concentrations are not linearly related, as evidenced by the below scatter plot.
-
-```{r a useful plot to include, eval=F}
-#Box plot of pollutant concentrations by %below FPL...need to fix x axis so its more convincing (Jorge)
-
-## I think to make it more convincing, we should just use a scatterplot, as these are both continuous variables and we're interested in the association (Cecilia)
-ggplot(stop_w_acs, aes(x = (Percent_Below_Poverty), y = mean_value, fill = variable)) +
-  geom_boxplot() +
-  labs(title = "Pollutant Concentrations by Income Level", x = "Percent Below Poverty", y = "Pollutant Concentration") +
-  theme_minimal()
-
-## This scatterplot is not compelling at all - I don't think we should really include this. We can say they're not linearly related. (Cecilia)
-ggplot(stop_w_acs %>% filter(variable=="neph_bscat"), aes(x = (Percent_Below_Poverty), y = mean_value)) +
-  geom_point(shape=1) +
-  labs(title = "PM2.5 Concentrations by Income Level", x = "Percent Below Poverty", y = "Pollutant Concentration") +
-  theme_minimal()
-
-ggplot(stop_w_acs %>% filter(variable=="no2"), aes(x = (Percent_Below_Poverty), y = mean_value)) +
-  geom_point(shape=1) +
-  labs(title = "PM2.5 Concentrations by Income Level", x = "Percent Below Poverty", y = "Pollutant Concentration") +
-  theme_minimal()
-
-```
-
-```{r}
-#NOTE: This needs to be played with/cleaned up but it works
-# Clean the data by removing rows with NA or non-finite values in the variables used for modeling
-
-# Edited to take out the is.finite -- why would we care about that? (Cecilia)
-stop_w_acs_clean <- stop_w_acs %>%
-  filter(
-    !is.na(mean_value) & 
-    !is.na(Percent_Below_Poverty) & 
-    !is.na(White) & 
-    !is.na(Language_other_than_English) & 
-    !is.na(log_m_to_a1) & 
-    !is.na(log_m_to_comm) 
-    # is.finite(mean_value) &
-    # is.finite(Percent_Below_Poverty) &
-    # is.finite(White) &
-    # is.finite(Language_other_than_English) &
-    # is.finite(log_m_to_a1) &
-    # is.finite(log_m_to_comm)
-  )
-
-pm25_stop_acs_clean <- stop_w_acs_clean %>% filter(variable == "neph_bscat")
-
-no2_stop_acs_clean <- stop_w_acs_clean %>% filter(variable == "no2")
-
-pm25_annual_data <- annual_data
-
-# View(pm25_stop_acs_clean)
-# View(no2_stop_acs_clean)
-
-# Fit the linear regression model -- this does not incorporate universal kriging, so I am commenting it out
-# pm25_model <- lm(
-#   mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp, 
-#   data = pm25_stop_acs_clean
-# )
-# 
-# no2_model <- lm(
-#   mean_value ~ Percent_Below_Poverty + White + Language_other_than_English + log_m_to_a1 + log_m_to_comm + log_m_to_l_airp,
-#   data = no2_stop_acs_clean
-# )
-# 
-# # Display the summary of the model
-# summary(pm25_model)
-# summary(no2_model)
-# 
-# # Plot residuals vs. fitted values to check assumptions
-# plot(pm25_model, which = 1, main = "Residuals vs Fitted")
-# plot(no2_model, which =1, main = "Residuals vs Fitted")
-```
-
 ```{r}
 # Ensure Percent_Below_Poverty in grid_w_acs is numeric
 grid_w_acs <- grid_w_acs %>%
@@ -1965,264 +1625,6 @@ grid_w_acs <- grid_w_acs %>%
 newgrid_w_acs <- grid_w_acs %>%    mutate(TRACTCE = substr(as.character(tract_key), 
             nchar(as.character(tract_key)) - 5, nchar(as.character(tract_key))))
 newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
-
-```
-
-Note: I likely broke this below because I commented out the incorrect predictions (Cecilia).
-```{r, eval=FALSE}
-# Define the CRS (EPSG:32148 - Washington State Plane North, NAD83)
-lambert_crs <- st_crs(32148)
-latlong_proj <- 4326
-
-# Reproject the spatial data to Lambert Conformal Conic
-#data_lambert <- st_transform(census_shapefile, crs = lambert_crs)
-
-# Ensure the dataset is an sf object (it likely already is)
-newgrid_w_acs2 <- st_as_sf(newgrid_w_acs2)
-
-# Check the CRS (Coordinate Reference System)
-st_crs(newgrid_w_acs2)
-
-# Transform to Lambert Conformal Conic projection (if not already)
-newgrid_w_acs2_lambert <- st_transform(newgrid_w_acs2, crs = lambert_crs)
-
-# Plot the predicted PM2.5 concentrations
-ggplot(newgrid_w_acs2_lambert) +
-  geom_sf(aes(fill = predicted_pm25), color = NA) +
-  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + # Color-blind-friendly palette
-  labs(
-    title = "Predicted PM2.5 Concentrations by Census Tract",
-    subtitle = "Lambert Conformal Conic Projection",
-    caption = "Data: ACS and Mobile Monitoring",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 12, hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 0),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-# Plot the predicted NO2 concentrations
-ggplot(newgrid_w_acs2_lambert) +
-  geom_sf(aes(fill = predicted_no2), color = NA) +
-  scale_fill_viridis_c(option = "plasma", name = "NO2 (ppb)") + # Color-blind-friendly palette
-  labs(
-    title = "Predicted NO2 Concentrations by Census Tract",
-    subtitle = "Lambert Conformal Conic Projection",
-    caption = "Data: ACS and Mobile Monitoring",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 12, hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 0),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-
-# percent below poverty map
-ggplot(newgrid_w_acs2_lambert) +
-  geom_sf(aes(fill = Percent_Below_Poverty), color = NA) +
-  scale_fill_viridis_c(option = "plasma", name = "Percent") + # Color-blind-friendly palette
-  labs(
-    title = "Percent Below Poverty by Census Tract",
-    subtitle = "Lambert Conformal Conic Projection",
-    caption = "Data: ACS and Mobile Monitoring",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 12, hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 0),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-```
-
-```{r, eval=FALSE}
-# Ensure the data is in EPSG:4326 (latitude/longitude)
-newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326)
-
-# Plot with OpenStreetMap basemap Predicted Pm2.5
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
-  geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_pm25), color = NA, alpha = 0.8) +
-  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") +
-  labs(
-    title = "Predicted PM2.5 Concentrations",
-    subtitle = "Overlayed on OpenStreetMap Basemap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 12, hjust = 0.5),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-
-# Plot with OpenStreetMap basemap Predicted NO2
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
-  geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_no2), color = NA, alpha = 0.8) +
-  scale_fill_viridis_c(option = "plasma", name = "NO2 (ppb)") +
-  labs(
-    title = "Predicted NO2 Concentrations",
-    subtitle = "Overlayed on OpenStreetMap Basemap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 12, hjust = 0.5),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-```
-
-```{r, eval=FALSE}
-# Plot with transparency PM2.5
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
-  geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_pm25), color = NA, alpha = 0.06) +  # Adjust alpha for transparency
-  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") +  # Color-blind-friendly palette
-  labs(
-    title = "Predicted PM2.5 Concentrations",
-    subtitle = "Overlayed on OpenStreetMap Basemap with Transparency",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 12, hjust = 0.5),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-# Plot with transparency NO2
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap tiles
-  geom_sf(data = newgrid_w_acs2_latlong, aes(fill = predicted_no2), color = NA, alpha = 0.06) +  # Adjust alpha for transparency
-  scale_fill_viridis_c(option = "plasma", name = "NO2(ppb)") +  # Color-blind-friendly palette
-  labs(
-    title = "Predicted NO2 Concentrations",
-    subtitle = "Overlayed on OpenStreetMap Basemap with Transparency",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 12, hjust = 0.5),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-```
-
-```{r, eval=FALSE}
-
-# Load King County, WA shapefile 
-king_county <- counties(state = "WA", cb = TRUE) %>% filter(NAME == "King") 
-
-king_county <- st_transform(king_county, crs = 4326)
-
-# Ensure the data is in EPSG:4326 (latitude/longitude) 
-newgrid_w_acs2_latlong <- st_transform(newgrid_w_acs2, crs = 4326) 
-
-# Clip the predicted PM2.5 data to the boundary of King County 
-newgrid_king_county <- st_intersection(newgrid_w_acs2_latlong, king_county) 
-
-# Plot with OpenStreetMap basemap, focusing on King County, WA for PM2.5
-
-ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
-  geom_sf(data = newgrid_king_county, aes(fill = predicted_pm25), color = NA, alpha = 0.8) + scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA",
- subtitle = "Overlayed on OpenStreetMap Basemap", x = "Longitude", y = "Latitude" ) + theme_minimal() + theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) ) 
-
-# Plot with transparency for better clarity 
-ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
-  geom_sf(data = newgrid_king_county, aes(fill = predicted_pm25), color = NA, alpha = 0.06) + # Adjust alpha for transparency 
-  scale_fill_viridis_c(option = "plasma", name = "PM2.5 (µg/m³)") + # Color-blind-friendly palette 
-  labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA", subtitle = "Overlayed on OpenStreetMap Basemap with Transparency", x = "Longitude", y = "Latitude" ) + theme_minimal() +               theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) )        
-
-# Plot with OpenStreetMap basemap, focusing on King County, WA for PM2.5
-
-ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
-  geom_sf(data = newgrid_king_county, aes(fill = predicted_no2), color = NA, alpha = 0.8) + scale_fill_viridis_c(option = "plasma", name = "NO2 (ppb)") + labs( title = "Predicted NO2 Concentrations in Greater King County, WA",
- subtitle = "Overlayed on OpenStreetMap Basemap", x = "Longitude", y = "Latitude" ) + theme_minimal() + theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) ) 
-
-# Plot with transparency for better clarity 
-ggplot() + annotation_map_tile(type = "osm", zoom = 11) + # Adjust zoom level for King County 
-  geom_sf(data = newgrid_king_county, aes(fill = predicted_no2), color = NA, alpha = 0.06) + # Adjust alpha for transparency 
-  scale_fill_viridis_c(option = "plasma", name = "NO2(ppb)") + # Color-blind-friendly palette 
-  labs( title = "Predicted PM2.5 Concentrations in Greater King County, WA", subtitle = "Overlayed on OpenStreetMap Basemap with Transparency", x = "Longitude", y = "Latitude" ) + theme_minimal() +               theme( plot.title = element_text(size = 16, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 12, hjust = 0.5), legend.title = element_text(size = 12), legend.text = element_text(size = 10) )                  
-```
-#### Stephanie and Jorge's additions
-#Poverty and PM2.5 map
-```{r, include=F, eval=F}
-# Normalize PM2.5 and Poverty levels to a 0–1 range
-newgrid_king_county <- newgrid_king_county %>%
-  mutate(
-    pm25_scaled = scales::rescale(predicted_pm25, to = c(0, 1)),
-    poverty_scaled = scales::rescale(Percent_Below_Poverty, to = c(0, 1)),
-    bivar_index = (pm25_scaled + poverty_scaled) / 2  # Combine into a single index
-  )
-
-# Define a bivariate color palette (e.g., high PM2.5 = red, high poverty = blue)
-bivariate_colors <- c(
-  "low_low" = "#e8e8e8",  # Low PM2.5, Low Poverty
-  "low_high" = "#89a1c8",  # Low PM2.5, High Poverty
-  "high_low" = "#c48491",  # High PM2.5, Low Poverty
-  "high_high" = "#ad6d4e"  # High PM2.5, High Poverty
-)
-
-# Assign bivariate categories
-newgrid_king_county <- newgrid_king_county %>%
-  mutate(
-    bivar_category = case_when(
-      pm25_scaled <= 0.5 & poverty_scaled <= 0.5 ~ "low_low",
-      pm25_scaled <= 0.5 & poverty_scaled > 0.5 ~ "low_high",
-      pm25_scaled > 0.5 & poverty_scaled <= 0.5 ~ "high_low",
-      pm25_scaled > 0.5 & poverty_scaled > 0.5 ~ "high_high"
-    )
-  )
-
-# Plot the bivariate map
-ggplot() +
-  geom_sf(data = newgrid_king_county, aes(fill = bivar_category), color = NA, alpha = 0.8) +
-  scale_fill_manual(
-    values = bivariate_colors,
-    name = "Bivariate\nLegend",
-    labels = c("Low PM2.5, Low Poverty", "Low PM2.5, High Poverty",
-               "High PM2.5, Low Poverty", "High PM2.5, High Poverty")
-  ) +
-  labs(
-    title = "Bivariate Map of PM2.5 and Poverty Levels in King County, WA",
-    subtitle = "High PM2.5 and High Poverty areas are highlighted",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 14, hjust = 0.5),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
 
 ```
 
@@ -2272,9 +1674,7 @@ ggplot() +
   )
 
 ```
-#Linear regression Predicted NO2 and poverty
-RESULTS:
-The relationship between predicted nitrogen dioxide (NO2) levels and the percentage of the population below the poverty line was examined using linear regression. The model revealed a significant positive association between poverty and NO2 levels (Estimate = 0.143, p < 0.001), indicating that areas with higher poverty rates are associated with higher predicted NO2 concentrations. The model explained approximately 17.6% of the variance in predicted NO2 levels (Adjusted R-squared = 0.176). The intercept suggests a baseline NO2 level of 7.39 in areas with no population below the poverty line. These findings highlight a potential environmental justice concern, with higher NO2 levels disproportionately affecting lower-income communities.
+
 ```{r, eval=FALSE}
 colnames(newgrid_king_county)
 
@@ -2378,6 +1778,7 @@ ggplot() +
   )
 
 ```
+
 #Linear regression of predicted NO2 and language diversity
 ```{r, eval=FALSE}
 
@@ -2414,10 +1815,6 @@ ggplot(data, aes(x = Language_other_than_English, y = predicted_no2)) +
   )
 
 ```
-
-#Map of Predicted NO2 and language diversity
-
-This map visualizes the relationship between predicted nitrogen dioxide (NO₂) levels and language diversity in a specific geographic area, likely in Washington State, as it includes landmarks like Seattle and Tacoma. It is categorized into four distinct levels of NO₂ and language diversity
 
 ```{r, eval=FALSE}
 # Ensure columns are numeric and remove invalid values
@@ -2496,10 +1893,6 @@ ggplot() +
 
 ```
 
-#MLR racial diversity and predicted NO2
-
-Narrative for write up: 
-A multiple linear regression model examined the relationship between predicted nitrogen dioxide (NO2) levels and race-related variables. Areas with higher proportions of Black/African American and "Two or More Races" residents were associated with increased NO2 levels, while areas with higher proportions of White, American Indian and Alaska Native (AIAN), and Asian residents had lower predicted NO2 levels. The category "Hawaiian/Pacific Islander" showed no significant association with NO2 levels. The findings highlight disparities in environmental exposures across racial groups, with potential implications for public health and environmental justice. Targeted interventions are needed to address elevated NO2 levels in disproportionately affected communities.
 ```{r, eval=FALSE}
 # Load the dataset
 data <- newgrid_king_county
@@ -2569,11 +1962,11 @@ kable(coefficients_table, caption = "Regression Results for Predicted NO2 and Ra
 par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
 plot(model)
 
+###Racial diversity - NOTE: size needs to be explored so maps are less squished
+
+#Text for write up: This map visualizes the racial and ethnic composition of King County, Washington, by census tract, with an OpenStreetMap background for spatial context. Each panel represents the percentage distribution of a specific racial or ethnic group, including American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. The color gradient indicates the concentration, with darker shades representing higher percentages. This visual provides a detailed geographic understanding of demographic patterns across the county. Data sources include ACS and OpenStreetMap.
 ```
 
-#Racial diversity - NOTE: size needs to be explored so maps are less squished
-
-Text for write up: This map visualizes the racial and ethnic composition of King County, Washington, by census tract, with an OpenStreetMap background for spatial context. Each panel represents the percentage distribution of a specific racial or ethnic group, including American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. The color gradient indicates the concentration, with darker shades representing higher percentages. This visual provides a detailed geographic understanding of demographic patterns across the county. Data sources include ACS and OpenStreetMap.
 ```{r, eval=FALSE}
 # For adding OpenStreetMap tiles
 
@@ -2647,11 +2040,12 @@ ggplot() +
     legend.position = "right",
     panel.background = element_rect(fill = "transparent", color = NA)
   )
+
+##Racial map choropleth
+#Text for write up: 
+#This map displays the dominant racial or ethnic group by census tract in Snohomish, Pierce, and King County, Washington, overlaid on an OpenStreetMap basemap for geographic context. Each tract is color-coded to represent the racial or ethnic group with the highest proportion of residents. Groups represented include American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. This visualization highlights the spatial distribution of demographic dominance across the county, providing insights into the region's racial and ethnic diversity. Data sources include the American Community Survey (ACS), Mobile Monitoring, and OpenStreetMap.
 ```
 
-#Racial map choropleth
-Text for write up: 
-This map displays the dominant racial or ethnic group by census tract in Snohomish, Pierce, and King County, Washington, overlaid on an OpenStreetMap basemap for geographic context. Each tract is color-coded to represent the racial or ethnic group with the highest proportion of residents. Groups represented include American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. This visualization highlights the spatial distribution of demographic dominance across the county, providing insights into the region's racial and ethnic diversity. Data sources include the American Community Survey (ACS), Mobile Monitoring, and OpenStreetMap.
 ```{r, eval=FALSE}
 # For adding OpenStreetMap tiles
 
@@ -2720,13 +2114,7 @@ ggplot() +
     panel.background = element_rect(fill = "transparent", color = NA)
   )
 
-
 ```
-#Language diversity
-Text for write up: 
-This map visualizes language use at home by census tract in Snohomish, Pierce, and King County, Washington, with an OpenStreetMap background for geographic context. The two panels represent the percentage distribution of households where English is the primary language ("English Only") and households where other languages are predominantly spoken ("Language Other Than English").
-
-The left panel highlights areas where English is predominantly spoken, with darker shades indicating higher percentages. The right panel illustrates areas where other languages dominate, showing significant linguistic diversity across the region. The color gradient reflects the proportion of households, from lower percentages in blue to higher percentages in yellow. This map provides insights into the spatial distribution of language use in the county. Data sources include the American Community Survey (ACS) and OpenStreetMap.
 
 ```{r, eval=FALSE}
 # For adding OpenStreetMap tiles
@@ -2790,53 +2178,15 @@ ggplot() +
     panel.background = element_rect(fill = "transparent", color = NA)
   )
 
-```
+##Language diversity
+#Text for write up: 
+#This map visualizes language use at home by census tract in Snohomish, Pierce, and King County, Washington, with an OpenStreetMap background for geographic context. The two panels represent the percentage distribution of households where English is the primary language ("English Only") and households where other languages are predominantly spoken ("Language Other Than English").
 
-
-
-#Cross-Validation -- this is currently incorrect since it was using the wrong predictions.
-```{r, eval=FALSE}
-# Ensure the data has a unique ID column
-no2_data <- stop_for_preds %>%
-  filter(variable == "no2") %>%
-  mutate(ID = row_number())  # Add a unique ID for each row
-
-# Define Functions
-get_MSE <- function(obs, pred) {
-  obs_avg <- mean(obs)
-  MSE_obs <- mean((obs - obs_avg)^2)
-  MSE_pred <- mean((obs - pred)^2)
-  c(RMSE = sqrt(MSE_pred), MSE_based_R2 = max(1 - MSE_pred / MSE_obs, 0))
-}
-
-do_CV <- function(data, id = "id", group = "group", formula) {
-  lapply(unique(data[[group]]), function(this_group) {
-    CV_lm <- lm(formula, data = data[data[[group]] != this_group, ])
-    data[data[[group]] == this_group, ] %>%
-      mutate(cvpreds = predict(CV_lm, newdata = .) %>% unname())
-  }) %>% bind_rows() %>% arrange(.data[[id]])
-}
-
-# Define formula for the model
-frml <- as.formula(log_mean ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + pop10_s05000)
-
-# Create Random Cross-Validation Groups
-set.seed(123)
-no2_data <- no2_data %>%
-  mutate(CV_grp = sample(rep(1:10, length.out = n())))
-
-# Perform Cross-Validation
-cv_results <- do_CV(data = no2_data, id = "ID", group = "CV_grp", formula = frml)
-
-# Calculate RMSE and R2
-metrics <- get_MSE(no2_data$log_mean, cv_results$cvpreds)
-
-# Print Metrics
-print(metrics)
+#The left panel highlights areas where English is predominantly spoken, with darker shades indicating higher percentages. The right panel illustrates areas where other languages dominate, showing significant linguistic diversity across the region. The color gradient reflects the proportion of households, from lower percentages in blue to higher percentages in yellow. This map provides insights into the spatial distribution of language use in the county. Data sources include the American Community Survey (ACS) and OpenStreetMap.
 
 ```
 
-# Appendix
+# Appendix 1: Supplementary results
 
 ## Map of Study Area Stop Concentrations Using Stop Data
 
@@ -2878,81 +2228,181 @@ no2_map_stop + pm25_map_stop + plot_annotation(title = 'Map of Study Area Stop C
                 plot.caption=element_text(hjust=0.5)))
 ```
 
-
-
-
-
 ## NO2 Variograms and UK Predictions
 
-### Variograms for NO2 UK Predictions
-
 ```{r variogram.plots.no2.appendix}
-ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) + 
-  geom_point(alpha=0.1) + 
-  labs(x="Distance (meters)",
-       title="Variogram Cloud Using Annual Mean Concentration: NO2")
-
-# Binned Variogram with annual data
-plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")), main="Binned Variogram with Annual Concentration Data: NO2")
-
-# Binned Variogram with Point Counts
-plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")), pl = TRUE, main="Binned Variogram with Annual Concentration Data with Point Counts: NO2")
-
-# Semi-variogram cloud with smoothed curve
-ggplot(data = vgm_no2_annual, aes(x = dist, y = gamma)) +
-  geom_point(shape = 1, alpha = 0.6) +
-  geom_smooth(se = FALSE, color = "red", linetype = "solid",
-              # making span > 0.75 (default) makes this less wiggly so we can better see the general trend 
-              method = "loess", 
-              span = .8
-              ) +
-  labs(x = "Distance (meters)", 
-       y = "Semi-variance",
-       title = "Semi-variogram Cloud with Smoothed Curve: NO2") +
-  theme_bw() +
-  theme(legend.position = "none")
+# ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) + 
+#   geom_point(alpha=0.1) + 
+#   labs(x="Distance (meters)",
+#        title="Variogram Cloud Using Annual Mean Concentration: NO2")
+# 
+# # Binned Variogram with annual data
+# plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")), main="Binned Variogram with Annual Concentration Data: NO2")
+# 
+# # Binned Variogram with Point Counts
+# plot(variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + log_m_to_coast + log_m_to_l_airp + log_m_to_comm, annual_for_preds %>% filter(variable == "no2")), pl = TRUE, main="Binned Variogram with Annual Concentration Data with Point Counts: NO2")
+# 
+# # Semi-variogram cloud with smoothed curve
+# ggplot(data = vgm_no2_annual, aes(x = dist, y = gamma)) +
+#   geom_point(shape = 1, alpha = 0.6) +
+#   geom_smooth(se = FALSE, color = "red", linetype = "solid",
+#               # making span > 0.75 (default) makes this less wiggly so we can better see the general trend 
+#               method = "loess", 
+#               span = .8
+#               ) +
+#   labs(x = "Distance (meters)", 
+#        y = "Semi-variance",
+#        title = "Semi-variogram Cloud with Smoothed Curve: NO2") +
+#   theme_bw() +
+#   theme(legend.position = "none")
 
 plot(v_annual, v_annual.fit, main="Empirical Variogram with Fitted Model Overlaid: NO2")
 ```
 
-### UK Predictions of log(NO2) on Grid and Census Block Centroids
-
 ```{r grid.UK.preds.logNO2}
 # Plot UK predictions 
-pl3 <- plot(ln.no2.kr["var1.pred"], main = "UK Prediction of Log(NO2) on Grid")
-
-# Plot UK prediction standard errors 
-pl4 <- plot(ln.no2.kr["se"], main = "UK Prediction Error NO2 (Standard Error) on Grid")
+# pl3 <- plot(ln.no2.kr["var1.pred"], main = "UK Prediction of Log(NO2) on Grid")
+# 
+# # Plot UK prediction standard errors 
+# pl4 <- plot(ln.no2.kr["se"], main = "UK Prediction Error NO2 (Standard Error) on Grid")
 
 # Plot UK predictions
-pl3 <- plot(ln.NO2.block.kr["var1.pred"], main = "UK Prediction of Log(PM2.5) on Census Block Centroids")
+#pl3 <- plot(ln.NO2.block.kr["var1.pred"], main = "UK Prediction of Log(PM2.5) on Census Block Centroids")
 
 # Plot UK prediction standard errors
-pl4 <- plot(ln.NO2.block.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error) on Census Block Centroids")
+pl4 <- plot(ln.NO2.block.kr["se"], main = "UK Prediction Error PM2.5\n (Standard Error) on Census Block Centroids")
 ```
 
 ## PM2.5 Variograms and UK Predictions
 
-### Variograms for PM2.5 UK Predictions
-
 ```{r variogram.plots.pm25.appendix}
-
-plot(v.uk.pm25, main="Estimated Variogram for log(PM2.5)")
+#plot(v.uk.pm25, main="Estimated Variogram for log(PM2.5)")
 
 plot(v.uk.pm25, model = m.uk.pm25, main="Estimated Variogram for log(PM2.5) with Fitted Variogram")
 ```
 
-### UK Predictions of log(PM2.5) on Grid and Census Block Centroids
 ```{r UK.preds.logPM25}
 # Plot UK predictions grid
-pl3 <- plot(ln.PM25.kr.grid["var1.pred"], main = "UK Prediction of Log(PM2.5) on Grid")
-
-# Plot UK prediction standard errors grid
-pl4 <- plot(ln.PM25.kr.grid["se"], main = "UK Prediction Error PM2.5 (Standard Error) on Grid")
+# pl3 <- plot(ln.PM25.kr.grid["var1.pred"], main = "UK Prediction of Log(PM2.5) on Grid")
+# 
+# # Plot UK prediction standard errors grid
+# pl4 <- plot(ln.PM25.kr.grid["se"], main = "UK Prediction Error PM2.5 (Standard Error) on Grid")
 
 # Plot UK predictions block
-pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5) on Census Block Centroids")
+#pl3 <- plot(ln.PM25.kr["var1.pred"], main = "UK Prediction of Log(PM2.5) on Census Block Centroids")
 
 # Plot UK prediction standard errors block
-pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error) on Census Block Centroids")
+pl4 <- plot(ln.PM25.kr["se"], main = "UK Prediction Error PM2.5 (Standard Error)\n on Census Block Centroids")
+```
+
+## Univariate regression models
+
+```{r univar. results}
+
+# Formatted table for regression results NO2
+no2_univar_res %>%
+  select(term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>% 
+  mutate(
+    Term = case_when(
+      term == "Percent_Below_Poverty" ~ "% Below Poverty",
+      term == "p_engl_only" ~ "% English Language Only",
+      term == "p_lang_other" ~ "% Other Language",
+      term == "p_spanish" ~ "% Spanish Language",
+      term == "p_White" ~ "% White",
+      term == "p_BlackAA" ~ "% Black or African American",
+      term == "p_AIAN" ~ "% American Indian or Alaska Native",
+      term == "p_Asian" ~ "% Asian",
+      term == "p_HPI" ~ "% Hawaiian or Pacific Islander",
+      term == "p_Hispanic" ~ "% Hispanic or Latino",
+      TRUE ~ term 
+    )
+  ) %>%
+  select(Term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>%
+  rename(
+    Estimate = estimate,
+    Intercept = intercept,
+    `Std. Error` = std.error,
+    `t-value` = statistic,
+    `P-value` = p.value,
+    `95%CI Low` = conf.low,
+    `95%CI High` = conf.high
+  ) %>% 
+  kable(
+    caption = "Table: Univariate Regression for Association Results for NO2 Model. Response variable was log(NO2), and all results have been exponentiated. Each row represents a separate univariate regression model, with the Term as the predictor variable.",
+    digits = 3, 
+    col.names = c("Term", "Intercept", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
+  ) %>%
+  kable_styling(
+    full_width = FALSE, 
+    bootstrap_options = c("striped", "hover", "condensed")
+  )
+
+# Formatted table for regression results
+pm_univar_res %>%
+  select(term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>% 
+  mutate(
+    Term = case_when(
+      term == "Percent_Below_Poverty" ~ "% Below Poverty",
+      term == "p_engl_only" ~ "% English Language Only",
+      term == "p_lang_other" ~ "% Other Language",
+      term == "p_spanish" ~ "% Spanish Language",
+      term == "p_White" ~ "% White",
+      term == "p_BlackAA" ~ "% Black or African American",
+      term == "p_AIAN" ~ "% American Indian or Alaska Native",
+      term == "p_Asian" ~ "% Asian",
+      term == "p_HPI" ~ "% Hawaiian or Pacific Islander",
+      term == "p_Hispanic" ~ "% Hispanic or Latino",
+      TRUE ~ term 
+    )
+  ) %>%
+  select(Term, intercept, estimate, std.error, statistic, p.value, conf.low, conf.high) %>%
+  rename(
+    Estimate = estimate,
+    Intercept = intercept,
+    `Std. Error` = std.error,
+    `t-value` = statistic,
+    `P-value` = p.value,
+    `95%CI Low` = conf.low,
+    `95%CI High` = conf.high
+  ) %>% 
+  kable(
+    caption = "Table: Univariate Regression for Association Results for PM2.5 Model. Response variable was log(PM2.5), and all results have been exponentiated. Each row represents a separate univariate regression model, with the Term as the predictor variable.",
+    digits = 3, 
+    col.names = c("Term", "Intercept", "Estimate", "Std. Error", "t-value", "P-value", "95% CI Low", "95% CI High")
+  ) %>%
+  kable_styling(
+    full_width = FALSE, 
+    bootstrap_options = c("striped", "hover", "condensed")
+  )
+```
+
+# Appendix 2: 
+
+## Session information
+
+```{r session.info}
+#-----session information-----
+
+# print R session information
+sessionInfo()
+
+```
+
+## Embedded code
+
+```{r code.appendix, ref.label = knitr::all_labels(), echo = TRUE, eval = FALSE, , include=TRUE}
+#-----code appendix-----
+```
+
+## Functions defined 
+
+```{r functions, eval = TRUE}
+#-----functions-----
+
+# Show the names of all functions defined in the .Rmd
+# (e.g. loaded in the environment)
+lsf.str()
+
+# Show the definitions of all functions loaded into the current environment  
+lapply(c(lsf.str()), getAnywhere)
 ```
