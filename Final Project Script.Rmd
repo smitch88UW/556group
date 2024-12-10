@@ -500,7 +500,7 @@ pm25_map_annual <- g +
   labs(col="PM2.5 (ug/m3)", title="PM2.5"
        )
 
-no2_map_annual + pm25_map_annual + plot_annotation(title = 'Figure 2: Map of Study Area Stop Concentrations',
+no2_map_annual + pm25_map_annual + plot_annotation(title = 'Figure 2: Map of Study Area Annual \nAverage Concentrations',
   #subtitle = 'NO2 (left) and PM2.5 (right)',
   caption = 'This map captures the annual average concentrations of NO2 and PM2.5\n  at 304 monitoring locations. Both pollutants are presented on the native scale. \n NO2 is in ppb and PM2.5 is in ug/m3.',
   theme = theme(plot.title = element_text(face = "bold", hjust = 0.5),
@@ -1318,7 +1318,7 @@ no2_poverty_map <- ggplot() +
 bivariate_legend <- bi_legend(
   pal = "PurpleGrn",
   dim = 3,
-  xlab = "Higher PM2.5",
+  xlab = "Higher NO2",
   ylab = "Greater % Below Poverty",
   size = 8  
 )
@@ -1353,7 +1353,7 @@ no2_english_map <- ggplot() +
   geom_sf(data = no2_english_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "Figure 6: Relationship Between % English Language \nand Predicted NO2 Concentrations"
+    title = "Figure 6: Relationship Between % Only English \nSpeakers and Predicted NO2 Concentrations"
   ) +
   theme_minimal() +
   theme(
@@ -1367,8 +1367,8 @@ no2_english_map <- ggplot() +
 bivariate_legend <- bi_legend(
   pal = "PurpleGrn",
   dim = 3,
-  xlab = "Higher PM2.5",
-  ylab = "Greater % Below Poverty",
+  xlab = "Higher NO2",
+  ylab = "Greater % English only",
   size = 8  
 )
 
@@ -1988,7 +1988,7 @@ ggplot() +
 
 ```
 
-# Appendix 1: Supplementary results
+# Appendix 1: Supplementary Results
 
 ## Map of Study Area Stop Concentrations Using Stop Data
 
@@ -2184,7 +2184,7 @@ pm_univar_res %>%
   )
 ```
 
-# Appendix 2:
+# Appendix 2
 
 ## Session information
 
