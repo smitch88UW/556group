@@ -869,24 +869,35 @@ all(!is.na(new_blocks_no2$`ln(NO2) ln(ppb)`))
 
 ```{r plot.points}
 #NO2 - native scale
-ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) + 
+no2_uk_map <- ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) + 
   theme_minimal() +
   geom_sf(data = new_blocks_no2, aes(color = `NO2 (ppb)`), alpha = 0.05) +
   # color friendly color scale
   scale_color_viridis_c(option = "plasma") + 
-  ggtitle("Map of Seattle Area with UK NO2\n Predictions Overlaid as Points") +
+  ggtitle("Predicted NO2") +
   ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
-  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering) +
+  ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering)
 
 
 #PM2.5 - native scale
-ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) + 
+pm25_uk_map <- ggplot() + ggspatial::annotation_map_tile(type = "osm", zoom = 10, ) +
   theme_minimal() +
   geom_sf(data = new_blocks_pm25, aes(color = `PM2.5 (ug/m^3)`), alpha = 0.05) +
   # color friendly color scale
   scale_color_viridis_c(option = "plasma") + 
-  ggtitle("Map of Seattle Area with UK PM2.5\n Predictions Overlaid as Points") + ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
+  ggtitle("Predicted PM2.5") + ggspatial::annotation_scale(location = "bl", width_hint = 0.3, unit_category = "imperial") +  # Scale in miles
   ggspatial::annotation_north_arrow(location = "tr", which_north = "true", style = north_arrow_fancy_orienteering)
+
+# Combine maps
+uk_map <- (no2_uk_map | pm25_uk_map) + 
+  plot_annotation(
+    title = "Figure 3: Map of Study Area with UK NO2 and PM2.5 Predictions Overlaid as Points",
+    theme = theme(
+      plot.title = element_text(size = 14, face = "bold", hjust = 0.5, margin = margin(b = 20))
+    )
+  )
+
+print(uk_map)
 
 ```
 
@@ -1233,7 +1244,7 @@ pm_poverty_map <- ggplot() +
   geom_sf(data = pm_poverty_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "Figure 5: Relationship Between % Below Poverty \nand Predicted PM2.5 Concentrations"
+    title = "Figure 4: Relationship Between % Below Poverty \nand Predicted PM2.5 Concentrations"
   ) +
   theme_minimal() +
   theme(
@@ -1285,7 +1296,7 @@ no2_poverty_map <- ggplot() +
   geom_sf(data = no2_poverty_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "Figure 6: Relationship Between % Below Poverty \nand Predicted NO2 Concentrations"
+    title = "Figure 5: Relationship Between % Below Poverty \nand Predicted NO2 Concentrations"
   ) +
   theme_minimal() +
   theme(
@@ -1334,7 +1345,7 @@ no2_english_map <- ggplot() +
   geom_sf(data = no2_english_bivariate, aes(fill = bi_class), color = NA) +
   bi_scale_fill(pal = "PurpleGrn", dim = 3, name = NULL) +
   labs(
-    title = "Figure 7: Relationship Between % English Language \nand Predicted NO2 Concentrations"
+    title = "Figure 6: Relationship Between % English Language \nand Predicted NO2 Concentrations"
   ) +
   theme_minimal() +
   theme(
