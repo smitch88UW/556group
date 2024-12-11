@@ -8,11 +8,16 @@ output:
     toc: true
     toc_float: true
     toc_collapsed: true
-toc_depth: 3
+    self-contained: true #save images etc. in this file (vs folders)
+    toc_depth: 3
 date: "2024-12-10"
 execute:
-  echo: true
+  echo: false
   warning: false
+  tidy: false
+  tidy-options:
+    width.cutoff: 80
+    blank: false
   cache: false
   message: false
 editor_options: 
@@ -21,7 +26,19 @@ editor_options:
 
 # Background
 
-Insert intro here
+Traffic-related air pollution (TRAP) is an environmental pollutant and is a dominant contributor to urban air quality challenges. Nitrogen dioxide (NO₂) and fine particulate matter (PM2.5) are two major components of TRAP, which are both regulated at the ambient level under the Clean Air Act (Clean Air Act Amendments of 1990, 1990). The act gives the U.S. Environmental Protection Agency (EPA) the authority to establish national standards for six criteria air pollutants, all documented to adversely affect health (U.S. Environmental Protection Agency, 2013). PM2.5 exposure specifically has been linked to health effects ranging from airway irritation and aggravation of asthma symptoms to premature death in those with pre-existing cardiovascular or respiratory diseases (Particulate Matter (PM), 2016). NO₂ has been linked to similar health effects, alongside contributing to the development of asthma and greater susceptibility to respiratory infections (Nitrogen Dioxide (NO2), 2016).
+
+Higher levels of TRAP characterize urban cities such as the greater Seattle metropolitan area, yet monitoring of these pollutants is limited by the low spatial resolution provided by the few federal regulatory air monitors in the area. This is an issue when characterizing and predicting accurate exposure levels to air pollutants at a finer spatial scale. Public concern about air pollution and its impact on human health has grown significantly, especially for socially and economically marginalized communities who disproportionately bear environmental health risks, such as elevated exposure to air pollution (Hong & Jee, 2020; Loopmans et al., 2022).
+
+In Seattle, historical segregation, driven by practices like redlining, established a foundation for these inequities. Marginalized groups, often living near major roadways and transportation hubs, face heightened pollution exposure (Bramble et al., 2023; Clark et al., 2017). Segregation in Seattle initially targeted Asian Americans, who were confined to Chinatown until its demolition in 1886, forcing many to leave the city (Gregory, n.d.). By the mid-20th century, segregation laws, deed restrictions, and racially exclusive housing clauses confined Black, Asian, and Jewish residents to specific areas, further reinforced by systemic housing discrimination (Gregory, n.d.). Today, housing affordability has worsened these inequities, with median home prices in Seattle nearly seven times the median household income, double the 1990 home to income ratio (Groover, 2024).
+
+Historical patterns of segregation, systemic discrimination, and economic inequities have disproportionately subjected marginalized communities in Seattle to elevated exposure to harmful traffic-related air pollution (TRAP). This environmental injustice issue, compounded by income inequality and limited access to affordable housing, highlights the continued need to promote equitable outcomes. This study aims to expand upon the analysis conducted by Bramble et al., which explored exposure disparities related to income, race, and historic redlining through the application of air pollutant concentrations collected via a recent mobile monitoring campaign (Bramble et al., 2023). TRAP levels in the Seattle metropolitan area were recently characterized in a spatiotemporally balanced year-long mobile monitoring campaign for the purposes of assessing exposure levels for the Adult Changes in Thought (ACT) study (M. N. Blanco et al., 2022). For this study, we use these pollutant measurements and geographic covariates linked to each monitoring location alongside sociodemographic characteristics from the 2019 U.S. American Community Survey (ACS) at the census tract level, including racial demographics, poverty rates, and language diversity statistics, rather than Home Owners’ Loan Corporation (HOLC) grades and income metrics used in Bramble et al. 2023.
+
+This study aims to evaluate how historically marginalized communities in the Seattle metropolitan area—those impacted by systemic policies such as redlining, housing discrimination, and proximity to major roadways—experience disproportionately high exposure to TRAP, specifically PM2.5 and NO2. Leveraging high-resolution mobile monitoring data, land-use covariates, and updated sociodemographic information from the U.S. Census, this research seeks to characterize spatial variability in pollutant concentrations and assess associations between predicted pollutant levels and sociodemographic factors, including income, race/ethnicity, and language diversity. Building on prior research (e.g., (M. N. Blanco et al., 2022; Bramble et al., 2023; Mercer et al., 2011)), this study combines simplified prediction models with robust geostatistical methods to assess disparities in air pollution exposure. Ultimately, these findings aim to inform public health interventions and urban planning strategies to reduce exposure disparities and promote equitable outcomes in air quality management.
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE)
+```
 
 ```{r setup}
 # Clear workspace of all objects and unload non-base packages
@@ -70,7 +87,7 @@ pacman::p_load(
 
 ```
 
-```{r load.data}
+```{r load.data, include=FALSE}
 
 annual_data <- read_csv("annual_data_and_predictions.csv")
 
@@ -95,7 +112,7 @@ acs_poverty <- read_csv("ACS19_poverty.csv")
 census_blocks_covar <- read_csv("wa_block_covar_clean.csv")
 ```
 
-```{r data.cleaning}
+```{r data.cleaning, include=FALSE}
 # annual data
 table(annual_data$variable)
 
@@ -229,7 +246,7 @@ acs_combined <- reduce(
   list(acs_language_clean, acs_race_clean, acs_ethnicity_clean, acs_poverty),
   function(x, y) merge(x, y, by = c("GEO_ID", "NAME"), all = TRUE)
 ) %>% filter(Total_Pop_5yrsplus!=0)
-colnames(acs_combined)
+#colnames(acs_combined)
 
 
 #NOTE: Variables dropped from this merge: dropped 2ormore column due to complications with code running and to simplify demographics, dropped non-hispanic or latino since it was redundant and we have a "yes" column for hispanic or latino; also removed total_pop_5yearsplus since it is a variable for children over age 5 and did not seem relevant to our questions
@@ -303,29 +320,47 @@ grid_w_acs <- left_join(grid_covar_clean, acs_combined, join_by(tract_key==tract
 
 ## Data Description
 
+This study utilized air quality data from a mobile monitoring campaign conducted in the greater Seattle region, focusing on PM2.5 and NO2 concentrations collected at 309 designated stop sites (M. N. Blanco et al., 2022). Pollutant concentrations, including PM2.5 (in µg/m³) and NO2 (in ppb) were measured from March 2019 to March 2020, spanning all seasons, days of the week, and at nearly all times of day, rendering about 29 2-minute temporally-balanced samples at each stop location. The annual average concentrations for each stop location were used to make our predictions. This data also included location data (longitude and latitude). The pollutant concentrations, land-use covariates, and Washington State census block centroids were accessed via the ACT-AP Mobile Monitoring open-access data directory (M. Blanco & Sheppard, 2024).
+
+Land-use covariates were based on the stop locations, encompassing metrics such as proximity to roads, industrial areas, and airports. Land use covariates were selected based on their documented relevance in previous research, particularly Mercer et al., which highlights the influence of traffic and industrial sources on nitrogen oxide concentrations. To ensure consistency, the same land use covariates were applied to predict both average PM2.5 and NO2 concentrations. Land-use covariates were also obtained for the centroids of census blocks included in the study area.
+
+Socio-demographic data at the census tract level were obtained from the 2019 ACS, including race, ethnicity, income, and language diversity variables (U.S. Census Bureau, n.d.). The dataset included census tracts from mostly western King County and southwestern Snohomish County, and tracts with zero population (i.e., those over bodies of water) were excluded. This study area includes a variety of both urban and rural localities with a range of land uses (e.g., industrial, commercial, and residential) (M. N. Blanco et al., 2022). Economic disparity was measured using the percentage of individuals below the federal poverty level (FPL). Additionally, language diversity was assessed using the percent of individuals who speak a language other than English at home, and whether this language was Spanish or another language. Racial demographics were represented as a percent of the total census tract population identifying as White, Black or African American, Asian, American Indian or Alaska Native, Native Hawaiian or Pacific Islander, or Hispanic or Latino. Analyzing demographics at the census tract level provides a neighborhood-like semi-comparable spatial scale in which population size is similar across tracts, which is ideal for analyzing environmental justice concerns such as disparities in air pollution exposure.
+
 ## Data Cleaning and Exploration
+
+Census tracts with populations of zero were excluded and annual stop site data were filtered to retain only relevant pollutants: NO2 and PM2.5. The cleaned dataset included location of the data collection site, longitude, latitude, variable (PM2.5 or NO2), and mean value. Both pollutant distributions were examined and then log-transformed. Maps of NO2 and PM2.5 are presented on the native scale.
+
+Socio-demographic variables from the ACS were integrated with the cleaned stop site data using census tract codes. Land use covariates were log-transformed to stabilize variance and improve interpretability. For example, log-transformed distances typically represent the decay of air pollutant levels from the source with increasing distance. Since some covariates included zero values, a constant value of one was added to each land use covariate prior to log-transformation to avoid indefinite computations. We used log-transformed distances as land use covariates to capture the expected exponential decay of air pollutant concentrations with increasing distance from the source, aligning the prediction model more closely with real-world dispersion processes.
+
+Several maps were created to contextualize these socio-demographic patterns geographically. First, a map visualized the racial and ethnic composition of the study area by census tract, using an OpenStreetMap base map for spatial context. This map provides a detailed geographic understanding of demographic patterns across the study area. Language diversity was also visualized by the census tract in the study area. As the language diversity map took the smallest amount of memory, we included this map in the Appendix. These maps underscore the region's linguistic diversity and relevance to environmental justice concerns.
 
 ## Statistical Analysis
 
 ### Summary Statistics
 
+For NO2 and PM2.5, descriptive statistics were calculated (arithmetic and geometric means and standard deviations (SD), median, minimum, and maximum), and observation counts per pollutant were summarized. These descriptive statistics describe the central tendency and distribution of the annual concentrations of each air pollutant for March 2019-March 2020 for the stop locations. To illustrate mobile monitoring locations and the distribution of air pollution concentrations, the annual mean concentrations of each pollutant at the stop locations were mapped. For the sociodemographic variables of race/ethnicity, income, and language diversity, mean percentages and total population counts per county and the total area covered by the study were reported. Only the census tracts that contained the stop sites were included.
+
 ### Prediction Models
+
+For the prediction regression models, we selected the most similar GIS covariates to those used by Mercer et al. for PM2.5 and NO2 because of our interest in traffic-generated pollutants, which are a significant contributor to air quality impacts, particularly in urban environments ((M. N. Blanco et al., 2022; Bramble et al., 2023; Mercer et al., 2011)). The GIS covariates available to us were not exactly the same as Mercer et al., so we approximated them as closely as possible. The resulting covariates were distance from A1, A2, and A3 roads, distance to coast and commercial areas, population within 5000 meters in tens of thousands, and percent of industrial land use within a 3000-meter buffer. Although PM2.5 has multiple sources beyond vehicle emissions, including industrial emissions, residential heating, wildfires, and secondary air pollutants (e.g., SO₂ and NH₃) (McDuffie et al., 2021), the primary goal was to maintain consistency and comparability of land-use covariates across the two pollutants. To account for another major source of particulates in the area, distance from the airport was included as an additional covariate, given its role as a notable local emitter of particulate matter through aviation-related activities and associated ground traffic. This allowed for incorporating traffic-generated pollutants alongside other relevant PM2.5 sources while ensuring methodological consistency across pollutants. All distance measures of the land-use covariates were log-transformed, as were the outcome variables of NO2 and PM2.5.
+
+Prediction models relied on universal kriging techniques to account for spatial structure while incorporating land use covariates. Variograms were created to assess spatial autocorrelation and were fit using either exponential, spherical, or Matern models to characterize the range, sill, and nuggets of the fitted variograms. Spherical models were selected by the statistical software as the best fitted variograms. Final prediction models were created using the annual mean concentrations at each stop location. An annual average of the 29 pollutant measurements per stop location were used in place of individual stop measurements due to computational limitations in modeling (additional methods justification can be found in Appendix 1). Five-fold and ten-fold cross-validation (CV) were used to assess model accuracy and predictive performance for log-transformed NO2 and PM2.5 concentrations. MSE-based R\^2 and RMSE were presented to evaluate these prediction models. Pollutant-specific predictions representing annual average concentrations were mapped at the census block centroid level for the study area. These census block predictions were averaged by census tract, and we calculated summary statistics for these predicted annual means by census tract.
 
 ### Association Between Demographic Variables and Predicted Pollutants
 
-Multivariate equations:
+As our demographic variables were on the census tract level, we took the average block-level predictions by census tract to assess associations between demographic variables and predicted pollutants. Linear regression models were developed to investigate relationships between PM2.5 and NO2 concentrations and socio-demographic variables, including income, language, race/ethnicity, and geographic land-use characteristics. Predictor variables included the percentage of individuals below the FPL, the proportion of non-English speakers, and racial/ethnic composition at the census tract level. Racial/ethnic composition was approximated by the percentage of each racial or ethnic group, and thus, each group percentage was a different covariate. Our main model to test the association between sociodemographic factors and air pollution was a multivariate model with all socio-demographic covariates included. The regression equations for this were: $$log(Predicted PM2.5) = \beta_0 + \beta_1 PercentBelow Poverty + \beta_2PercentEnglish Language Only + \beta_3PercentSpanish Language +\\ \beta_4PercentOther Language + \beta_5PercentWhite + \beta_6PercentBlack + \beta_7PercentAsian + \beta_8PercentAmericanIndianAlaskaNative +\\ \beta_9PercentHawaiianOrPacificIslander + \beta_{10}PercentHispanicOrLatino $$ and $$log(Predicted NO2) = \beta_0 + \beta_1 PercentBelow Poverty + \beta_2PercentEnglish Language Only + \beta_3PercentSpanish Language +\\ \beta_4PercentOther Language + \beta_5PercentWhite + \beta_6PercentBlack + \beta_7PercentAsian + \beta_8PercentAmericanIndianAlaskaNative +\\ \beta_9PercentHawaiianOrPacificIslander + \beta_{10}PercentHispanicOrLatino $$
 
-$$log(Predicted PM2.5) = \beta_0 + \beta_1 PercentBelow Poverty + \beta_2PercentEnglish Language Only + \beta_3PercentSpanish Language +\\ \beta_4PercentOther Language + \beta_5PercentWhite + \beta_6PercentBlack + \beta_7PercentAsian + \beta_8PercentAmericanIndianAlaskaNative +\\ \beta_9PercentHawaiianOrPacificIslander + \beta_{10}PercentHispanicOrLatino $$
+As a sensitivity analysis, univariate relationships between each demographic covariates and each pollutant were also modeled with simple linear regression, using the equation: $$log(pollutant) =\beta_0 + \beta_1SociodemographicVar $$
 
-$$log(Predicted NO2) = \beta_0 + \beta_1 PercentBelow Poverty + \beta_2PercentEnglish Language Only + \beta_3PercentSpanish Language +\\ \beta_4PercentOther Language + \beta_5PercentWhite + \beta_6PercentBlack + \beta_7PercentAsian + \beta_8PercentAmericanIndianAlaskaNative +\\ \beta_9PercentHawaiianOrPacificIslander + \beta_{10}PercentHispanicOrLatino $$
+Estimates, standard errors, and 95% confidence intervals were summarized in tables and included in the Appendix. As the outcome variables were log-transformed, we exponentiated the results of all association models. Thus, each estimate represents the percent change in the pollutant associated with a one percent increase in the corresponding demographic variable.
 
-Univariate equations:
-
-$$log(pollutant) =\beta_0 + \beta_1SociodemographicVar $$
+Bivariate choropleth maps were created to visualize the spatial relationship between predicted air pollutant concentrations and the continuous sociodemographic variables (i.e., percent below the poverty limit and percent English-only speakers) at the census tract level. The quantile-based classification was used to divide both predicted pollutant concentrations and demographic variables into equal-sized groups, allowing for a 3x3 grid that highlights the variables’ joint distribution and relationship across the study area. Only the significant predictors from the regression for association analyses were mapped to identify census tracts within the study area with both greater pollutant concentrations and greater proportion of the socio-demographic variable.
 
 # Results
 
 ## Summary Statistics
+
+Histograms for NO2 and PM2.5 showed log-normal distributions (**Figure 1**), so all summary statistics and analyses, besides maps, are on the log scale. Maps are shown in the native scale to facilitate comparison with air quality standards.
 
 ```{r var.distributions}
 
@@ -383,6 +418,8 @@ faceted_histogram <- ggplot(data = combined_data, aes(value)) +
 # Display the plot
 print(faceted_histogram)
 ```
+
+Across the 304 stop locations, data was collected across 193 census tracts within the study area. For the study period of March 2019-March 2020, the mean NO2 concentration was 9.15 ppb (SD = 2.47) ppb and the mean PM2.5 concentration was 4.62 ug/m\^3 (SD = 0.57 ug/m\^3) (**Table 1**).
 
 ```{r desc.stats.annual.data}
 annual_clean %>% 
@@ -449,6 +486,8 @@ ggplot(grid_covar_clean) + geom_sf(size=0.001)
 
 ```
 
+**Figure 2** shows the geographic distribution of stop sites and their mean annual concentrations on the native scale. A map of individual observations per stop site can be found in the Appendix. Of the stops, those near downtown Seattle and between Renton and Kent had the highest NO2 concentrations, at approximately 45 ppb. For PM2.5, concentrations were highest in downtown Seattle and North Seattle, where the annual averages were 5 to 6 ug/m\^3. Annual average concentrations of NO2 varied from approximately 5 to 20 ppb, and annual average concentrations of PM2.5 varied from approximately 4 to 6 ug/m\^3.
+
 ```{r study.area.map.setup, warning=FALSE}
 # ---- Study Area Map Setup ----
 # Define a bounding box (min & max X and Y) with a 10,000m buffer around `grid_covar_clean`
@@ -509,6 +548,8 @@ no2_map_annual + pm25_map_annual + plot_annotation(title = 'Figure 2: Map of Stu
 
 ```
 
+**Table 2** presents demographics for the study area. These tracts include 1,092,264 people in the study area. The racial and ethnic makeup of the total study area shows that the population is predominantly white (67.68%, N = 739,244). The next largest racial/ethnic group was Asian at 15.5 %, then Hispanic or Latino (9.25%), Black or African American (6.21%), Hawaiian or Pacific Islander 0.61 %, and American Indian or Alaska Native (0.50%). Categories of “Other”, “Two or More Races,” or “Three or More Races” were not included for simplicity purposes while acknowledging the exclusionary nature of this analytical decision. On average, 8.66 % of each census tract had an income below the federal poverty level (SD=5.8%). For languages spoken, 71.32% spoke English only, and 24.11% spoke a language other than English. 6.09% spoke Spanish and 2.58% spoke another language.
+
 ```{r demographics.table}
 
 # Demographics table for study area
@@ -550,7 +591,7 @@ stop_for_preds <- st_transform(stop_for_preds, crs = lambert_proj)
 annual_for_preds <- st_transform(annual_for_preds, crs = lambert_proj) 
 ```
 
-```{r no2.variograms}
+```{r no2.variograms, message=FALSE, include=FALSE}
 # ---- Empirical Variogram Plots ----
 
 # Variogram Cloud with stop_for_preds --> 24956646 observations
@@ -579,7 +620,7 @@ vgm_no2_annual <- variogram(log_value ~ pop10_s05000 + lu_industrial_p03000 + lo
 
 ```
 
-```{r est.no2.var}
+```{r est.no2.var, message=FALSE, include=FALSE}
 # Estimate the empirical variogram
 ##  By default, the variogram() function limits the maximum lag distance. Increasing the cutoff parameter will allow it to calculate semivariance values over a larger distance, which might help the semivariogram level off if it's naturally reaching a sill
 
@@ -598,7 +639,7 @@ v_annual.fit <- fit.variogram(v_annual, vgm(c("Exp", "Sph", "Mat")))
 
 ```
 
-```{r fitting variogram for universal kriging no2}
+```{r fitting variogram for universal kriging no2, message=FALSE, include=FALSE}
 # Estimate the variogram with a covariate predictor
 # 100000 is way too high a cutoff
 
@@ -619,7 +660,7 @@ m_annual.uk <- fit.variogram(v_annual.uk, vgm(c("Exp", "Sph", "Mat")))
 
 ```
 
-```{r universal.kriging.prediction.no2.grid.annual, warning=FALSE}
+```{r universal.kriging.prediction.no2.grid.annual, warning=FALSE, message=FALSE, include=FALSE}
 #transform stop data to Lambert for distances 
 grid_for_preds <- st_as_sf(grid_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
   # # convert to a meters CRS
@@ -639,7 +680,7 @@ ln.no2.kr$se <- sqrt(ln.no2.kr$var1.var)  # Standard error is the square root of
 #plotting these in Appendix
 ```
 
-```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE}
+```{r universal.kriging.prediction.no2.BLOCK, warning=FALSE, message=FALSE, include=FALSE}
 #transform stop data to Lambert for distances 
 blocks_for_preds <- st_as_sf(census_blocks_covar_clean, coords = c('longitude', 'latitude'), crs = 4326) %>%
   # # convert to a meters CRS
@@ -658,7 +699,7 @@ ln.NO2.block.kr$se <- sqrt(ln.NO2.block.kr$var1.var)  # Standard error is the sq
 
 ```
 
-```{r generate.pm25.variogram}
+```{r generate.pm25.variogram, message=FALSE, include=FALSE}
 #Generate variograms for pm25
 
 # Estimate the variogram with a covariate predictor
@@ -677,7 +718,7 @@ m.uk.pm25 <- fit.variogram(v.uk.pm25, vgm(c("Exp", "Sph", "Mat")))
 #plot(v.uk.pm25, model = m.uk.pm25)
 ```
 
-```{r universal.kriging.prediction.pm25.grid, warning=FALSE}
+```{r universal.kriging.prediction.pm25.grid, warning=FALSE, message=FALSE, include=FALSE}
 # ---- Universal Kriging Prediction Code from Lab 6 ----
 
 # Fit the universal kriging model for PM2.5 and predict on the grid
@@ -691,7 +732,7 @@ ln.PM25.kr.grid$se <- sqrt(ln.PM25.kr.grid$var1.var)  # Standard error is the sq
 
 ```
 
-```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE}
+```{r universal.kriging.prediction.pm25.BLOCK, warning=FALSE, message=FALSE, include=FALSE}
 # ---- Universal Kriging Prediction Code from Lab 6 ----
 
 # Fit the universal kriging model for PM2.5 and predict on the grid
@@ -765,7 +806,7 @@ krige.cv.stats <- function(krige.cv.output, description) {
 
 ```
 
-```{r cross-validation-no2, warning=FALSE}
+```{r cross-validation-no2, warning=FALSE, message=FALSE}
 # ---- Cross-Validation for log(no2)----
 
 # Perform Universal Kriging (UK) with 5-fold Cross-Validation
@@ -790,7 +831,7 @@ cv10uk_no2 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + lo
 
 ```
 
-```{r cross-validation-pm25, warning=FALSE}
+```{r cross-validation-pm25, warning=FALSE, message=FALSE}
 # ---- Cross-Validation for log(PM2.5)----
 
 # Perform Universal Kriging (UK) with 5-fold Cross-Validation
@@ -814,6 +855,8 @@ cv10uk_pm25 <- krige.cv2(log_value ~ log_m_to_a1 + log_m_to_a2 + log_m_to_a3 + l
 #   kable(caption = "Summary of Kriging Cross-Validation Results for log(PM2.5)") %>% kable_styling()
 
 ```
+
+The variograms used for the universal kriging (UK) models are provided in the Appendix, while the cross-validation results are summarized in **Table 3**. Performance metrics, including Root Mean Squared Error (RMSE) and $R^2$ based on Mean Squared Error (MSE), were calculated for both NO2 and PM2.5. For NO2, the 5-fold cross-validation yielded an RMSE of 0.1293 (log(ppb)) and an $R^2$ of 0.7414, while the 10-fold cross-validation achieved an RMSE of 0.1289 (log(ppb)) and an $R^2$ of 0.7430, indicating robust model performance with marginal improvements using 10-fold CV. Similarly, for PM2.5, the 5-fold cross-validation produced an RMSE of 0.0727 (log(ug/m3)) and an $R^2$ of 0.6542, while the 10-fold cross-validation resulted in an RMSE of 0.0680 (log(ug/m3)) and an $R^2$ of 0.6975. These results demonstrate that the UK models performed consistently well for spatial interpolation of both pollutants, with slightly improved accuracy observed under the 10-fold cross-validation approach.
 
 ```{r CV.results.combined}
 
@@ -842,7 +885,7 @@ combined_CV_summary %>%
   kable_styling()
 ```
 
-```{r map.native.scale}
+```{r map.native.scale, message=FALSE}
 
 # exponentiate log vars
 ln.no2.kr$var1.pred.native <- exp(ln.no2.kr$var1.pred)
@@ -854,8 +897,8 @@ ln.no2.kr <- st_transform(ln.no2.kr, latlong_proj)
 ln.PM25.kr <- st_transform(ln.PM25.kr, latlong_proj)
 
 # check that coordinates are nearly identical
-all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.no2.kr))
-all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.PM25.kr))
+#all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.no2.kr))
+#all.equal(st_coordinates(blocks_for_preds), st_coordinates(ln.PM25.kr))
 
 # Join grid to predictions; do so by nearest feature to avoid precision merging issues
 new_blocks_no2 <- st_join(blocks_for_preds, ln.no2.kr, join = st_nearest_feature) %>% 
@@ -870,10 +913,12 @@ new_blocks_pm25 <- st_join(blocks_for_preds, ln.PM25.kr, join = st_nearest_featu
          `ln(PM2.5) se`=se)
 
 # Verify the join was successful (no NAs in predictions)
-all(!is.na(new_blocks_pm25$`ln(PM2.5) ln(ug/m^3)`)) 
-all(!is.na(new_blocks_no2$`ln(NO2) ln(ppb)`)) 
+#all(!is.na(new_blocks_pm25$`ln(PM2.5) ln(ug/m^3)`)) 
+#all(!is.na(new_blocks_no2$`ln(NO2) ln(ppb)`)) 
 #yay!
 ```
+
+Maps of the Seattle area with UK predictions overlaid as points can be found in **Figure 3**. The map of NO2 concentration predictions depicts greater concentrations along the underlying highway structure. Predicted NO2 was highest near downtown Seattle and along Interstate 5 (I-5). In the map of PM2.5 predictions, greater concentrations do not seem to correlate to major highways as much as in the NO2 predictions. Similarly to NO2, PM2.5 was highest near downtown Seattle, into North Seattle, and along I-5. Maps of the standard error from the UK models are shown in the Appendix.
 
 ```{r plot.points}
 #NO2 - native scale
@@ -925,6 +970,8 @@ full_data_w_preds <- acs_simplified %>% left_join(predicted_to_tracts_no2, join_
   filter(!is.na(`ln(NO2) ln(ppb)`) | !is.na(`ln(PM2.5) ln(ug/m^3)`))
 ```
 
+**Table 4** summarizes the descriptive statistics of the predicted annual means of NO2 and PM2.5 concentrations in the study area. Predicted NO2 concentrations had an arithmetic mean of 9.35 ppb and a geometric mean of 9.09 ppb, with a standard deviation of 2.35 ppb and a maximum value of 20.98 ppb. In contrast, PM2.5 concentrations were lower, with an arithmetic and geometric mean of 4.67 µg/m\^3 and 4.65 µg/m\^3, respectively, and a standard deviation of 0.51 µg/m\^3. PM2.5 concentrations ranged from 3.47 µg/m\^3 to 6.00 µg/m\^3. These predicted values are consistent with the observed data described in Table 1.
+
 ```{r desc.stats.pred.data}
 
 full_data_w_preds %>% 
@@ -949,10 +996,6 @@ full_data_w_preds %>%
                threeparttable = TRUE)
 
 ```
-
-## Important note about the full data
-
-**IMPORTANT**: FULL DATA containing the predicted NO2, predicted PM2.5, and ACS variables is located in the dataframe called "full_data_w_preds". This is the dataframe we should use to do our association tests. If there are variables in other acs sets you can sub that in in the line of code above as long as they still have "tract_key" -- otherwise you'll need to do a little more.
 
 ## Associations Between Pollutant Concentrations & Demographics
 
@@ -1041,6 +1084,8 @@ pm_univar_res <- rbind(pm_poverty_res,pm_white_res,pm_BlackAA_res,pm_AIAN_res,
   relocate(intercept, .before=estimate)
 
 ```
+
+A multiple linear regression analysis (MLR) for predicted PM2.5 concentrations (μg/m\^3) explored associations with various demographic and socioeconomic variables **Table 5**. The model fit was statistically significant and explained approximately 16.8% of the variance in predicted PM2.5 levels (Adjusted $R^2$ = 12.15%, Residual Standard Error = 0.1033), with an F-statistic of 3.613 (p-value = 0.0002). The intercept of 3.452 represents the baseline PM2.5 level when all predictors are at their reference values. A statistically significant positive association was observed with the percentage of individuals living below the poverty line (Estimate = 1.005, p = 0.001, 95% CI: 1.002–1.008), suggesting that a 1% increase in the poverty rate is associated with a 0.5% increase in PM2.5 levels. Other demographic and socioeconomic variables, including language composition and racial/ethnic groups, did not exhibit statistically significant associations with PM2.5 concentrations.
 
 ```{r q3.multivariate.reg.assoc.pm25}
 # Multiple linear regression model for PM2.5
@@ -1161,6 +1206,8 @@ no2_univar_res <- rbind(no2_poverty_res, no2_white_res, no2_BlackAA_res, no2_AIA
   relocate(intercept, .before=estimate)
 ```
 
+A second MLR analysis for predicted NO2 concentrations (ppb) was conducted **Table 6**. The model fit was statistically significant and explained approximately 23.75% of the variance in predicted NO2 concentrations (Adjusted $R^2$ = 19.49%, Residual Standard Error = 0.2057), with an F-statistic of 5.574 (p-value \< 3.189e-7). The intercept of 4.208 represents the baseline NO2 level when all predictors are at their reference values. A statistically significant positive association was observed between NO2 concentrations and the percentage of individuals living below the poverty line (Estimate = 1.013, p \< 0.001, 95% CI: 1.007–1.019), indicating that a 1% increase in the poverty rate corresponds to a 1.3% increase in NO2 levels. Similarly, areas with higher proportions of English-only speakers were significantly associated with elevated NO2 concentrations (Estimate = 1.011, p = 0.023, 95% CI: 1.001–1.020). However, no significant associations were observed for other variables, including the percent of White individuals (Estimate = 0.997, p = 0.390, 95% CI: 0.989–1.005) or other demographic groups, such as Spanish speakers, Black or African American populations, and Hispanic or Latino populations.
+
 ```{r q3.multivariate.reg.assoc.no2}
 # Multiple linear regression model for NO2
 no2_full <- lm(`ln(NO2) ln(ppb)` ~ Percent_Below_Poverty + p_engl_only + p_lang_other + p_spanish + p_White + p_BlackAA + p_AIAN + p_Asian + p_HPI + p_Hispanic, data = full_data_w_preds_perc)
@@ -1208,6 +1255,8 @@ no2_full_results %>%
 ```
 
 ## Bivariate choropleth visualization of predicted pollutants with demographic variables
+
+At the census tract, the relationship between predicted pollutant concentrations and the demographic predictors identified as significant from the regression for association analysis are shown in the bivariate choropleth maps of **Figures 4, 5, and 6**. **Figure 4** depicts the relationship between the percent of the population below poverty and predicted PM2.5 concentrations for each census tract. The most burdened census tracts are concentrated in Downtown Seattle and along major highways, such as I-5 and SeaTac International Airport. The southern and eastern regions of the study predominantly feature census tracts with a higher percentage of the population below poverty but comparatively lower PM2.5 concentrations. The central and western areas exhibit census tracts with elevated PM2.5 concentrations relative to their wealth.
 
 ```{r pm25.choropleth.map, warning=FALSE}
 
@@ -1282,6 +1331,8 @@ print(pm_poverty_map)
 
 ```
 
+**Figure 5** depicts the relationship between the percentage of the population below poverty and predicted NO2 concentrations. Similar to PM2.5, census tracts with the highest poverty percentages and NO2 concentrations are often concentrated near urban centers and major transportation corridors.
+
 ```{r no2.choropleth.map}
 ## generating plots for significant predictors from regression results
 
@@ -1334,8 +1385,11 @@ no2_poverty_map <- no2_poverty_map +
 # Display the final plot
 print(no2_poverty_map)
 
+```
 
+**Figure 6** visualizes the relationship between the percent of English-only speakers and predicted NO2 concentrations within each census tract. Tracts with the highest NO2 levels tend to coincide with areas where a larger proportion of the population only speaks English, though areas in South Seattle are characterized with greater NO2 and lower proportions of its population speaking only English.
 
+```{r}
 # NO2 and % English Language Only Map
 
 # Classify data for bivariate mapping
@@ -1427,566 +1481,33 @@ newgrid_w_acs2 <- left_join(newgrid_w_acs, census_clean, by = "TRACTCE")
 
 ```
 
-#improved map: DO NOT DELETE THIS MAP
+# Discussion
 
-```{r, eval=F}
-#Define the correct bivariate color palette
-bivariate_colors_corrected <- c(
-  "low_low" = "#f0f0f0",  # Low PM2.5, Low Poverty (light grey, almost transparent)
-  "low_high" = "#9ecae1",  # Low PM2.5, High Poverty (light blue)
-  "high_low" = "#fc9272",  # High PM2.5, Low Poverty (light red)
-  "high_high" = "#67000d"  # High PM2.5, High Poverty (dark red)
-)
+The pollutant concentrations observed throughout the study, on average, were below the one-year average National Ambient Air Quality Standard (NAAQS) for both NO2 and PM2.5 (NAAQS Table, 2024). While NO2 was characterized as much lower than its NAAQS, PM2.5 was much closer to its NAAQS, indicating that current efforts are sufficient–according to this analysis–in keeping the Seattle area within compliance with the standards set by the Clean Air Act. The study area was also characterized by fairly homogeneous concentrations of PM2.5, ranging from about 4 to 5 ug/m\^3, and more heterogeneous NO2 concentrations, ranging from about 5 to 25 ppb, which reduced the variability of our data. This is in contrast to other urban areas in the United States, such as Los Angeles or Chicago, that exhibit much higher TRAP levels and, at times, are not in NAAQS compliance (Allen et al., 2009).
 
-# Filter and ensure CRS is consistent
-newgrid_king_county_filtered <- st_transform(newgrid_king_county, crs = 4326)
+The universal kriging models for NO2 and PM2.5 demonstrated strong predictive performance, with our 5-fold and 10-fold cross-validation metrics indicating robust spatial interpolation across models. The predicted map of NO2 illustrates that concentrations were highest near downtown Seattle and along I-5, reflecting the influence of traffic emissions. This finding is consistent with previous literature on the association between pollutant levels and traffic proximity, as well as on the high performance of the universal kriging model in predicting such relationships with relevant land use variables (Mercer et al., 2011). The predicted map of PM2.5 concentrations also exhibited peak values in the downtown area but were less aligned with road networks and were less spatially concentrated. This suggests that additional sources of PM2.5 are not as well captured by our selected land-use covariates in the prediction model, as compared to the NO2 model.
 
-# Plot with the corrected color scheme and appropriate transparency
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap basemap
-  geom_sf(data = newgrid_king_county_filtered, aes(fill = bivar_category), color = NA, alpha = 0.8) +  # Increased transparency for subtle areas
-  scale_fill_manual(
-    values = bivariate_colors_corrected,
-    name = "PM2.5 & Poverty Levels",
-    labels = c(
-      "High PM2.5, High Poverty",
-      "High PM2.5, Low Poverty",
-      "Low PM2.5, High Poverty",
-      "Low PM2.5, Low Poverty")
-  ) +
-  labs(
-    title = "PM2.5 and Poverty Levels in King County, WA",
-    subtitle = "High PM2.5 and High Poverty areas are highlighted in dark red",
-    caption = "Data Sources: ACS, Mobile Monitoring, OpenStreetMap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 14, hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 1),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10),
-    legend.position = "right",  # Legend on the right-hand side
-    legend.box = "vertical",
-    panel.background = element_rect(fill = "transparent", color = NA)
-  )
+The findings from the MLR models for predicted annual PM2.5 (μg/m³) and NO2 (ppb) concentrations consistently highlight poverty as a significant predictor of exposure to both pollutants, corroborating prior research linking socioeconomic disadvantage to heightened environmental pollution burdens (Bramble et al., 2023; Chi et al., 2016). While some associations with racial and ethnic variables were non-significant, poverty consistently demonstrated a small but significant relationship with pollutant exposure. The relatively low adjusted R-squared of both models suggests that other factors, such as unmeasured sources of air pollutants’ spatial variability and environmental conditions, also play a role in shaping PM2.5 and NO2 exposure.These results emphasize the multifaceted nature of air pollution disparities, shaped by both demographic and spatial factors. Future studies should consider additional confounding variables, explore spatial heterogeneity in pollutant distribution, and refine models to improve explanatory power.
 
-```
+The spatial relationships between demographic variables and pollutant concentrations are further illustrated through bivariate choropleth maps. These visualizations provide spatial representations of the disparities identified in the regression analyses, emphasizing the heightened exposure faced by disadvantaged communities. Elevated NO2 levels, in particular, were associated with lower-income communities, highlighting critical public health and environmental justice implications. Additionally, a greater percentage of only English speaking populations was also identified as a significant predictor of higher NO2 levels. This highlights the complexity of linguistic diversity as a potential social determinant of health. For instance, among children who did not speak English at home, a study of vehicular air pollution found significantly higher exposures among Black children, as compared to white children (Rubio et al., 2021). This underscores the influence of multiple identities in environmental exposures and the importance of considering these factors collectively. The observed spatial and demographic patterns align with broader societal inequities, where marginalized communities often reside in areas with higher pollution levels due to systemic issues such as housing segregation, economic disinvestment, and siting of pollutant sources like roadways and factories. Overall, our findings support targeted interventions that prioritize addressing elevated pollution levels in disproportionately impacted communities to reduce exposure-related health risks and advance environmental equity.
 
-```{r, eval=FALSE}
-colnames(newgrid_king_county)
+Notably, our study builds upon the work of Bramble et al. (2023) by addressing disparities in TRAP exposure using mobile monitoring data, while diverging in our focus on different pollutants and sociodemographic metrics. Bramble et al. evaluated multiple pollutants with a specific emphasis on historical redlining grades and income disparities at the census-block level. Their study also used ACS data from a decade before the monitoring data were collected, potentially resulting in misclassification. In contrast, our study focused on NO2 and PM2.5 and incorporated updated 2019 ACS demographic data. While Bramble et al. incorporated more geographic covariates (N = 191) in their prediction model, both our models exhibit similar cross-validated R\^2 values. This suggests that our simplified universal kriging model may be sufficient in predicting the spatial distribution of these air pollutants, while also being more interpretable and actionable. Additionally, while Bramble et al. showed significant relationships between historical HOLC grades and pollutant exposures, we emphasized current socio-demographic variables like poverty and language diversity. Our selected variables do not fully account for the systemic factors driving social inequities and determinants of health, thus resulting in smaller effect estimates than those found in Bramble’s HOLC grade analysis. The methodological differences and pollutant focus in our study highlight complementary perspectives on environmental justice in the Seattle metropolitan area to those found by Bramble et al.
 
-# Load the dataset
-data <- newgrid_king_county
+## Strengths and Limitations
 
-# Clean the data: Ensure columns are numeric and remove invalid values
-data <- data %>%
-  mutate(
-    predicted_no2 = as.numeric(as.character(predicted_no2)),
-    Percent_Below_Poverty = as.numeric(as.character(Percent_Below_Poverty))  # Replace with the actual column name for below poverty
-  ) %>%
-  filter(
-    !is.na(predicted_no2),
-    !is.na(Percent_Below_Poverty),
-    is.finite(predicted_no2),
-    is.finite(Percent_Below_Poverty)
-  )
+This study demonstrates several key strengths and limitations that inform its scope and applicability. One major strength is using high spatial resolution pollutant predictions, achieved through universal kriging over census block centroids, which enables precise characterization of exposure patterns across geographic areas while incorporating the land use covariates. The integration of sociodemographic variables specific to the year monitoring was conducted further enhances the analysis, offering a robust framework to assess environmental justice implications and highlight disparities in pollutant exposure. Additionally, using simplified models increases the accessibility and reproducibility of the methodology, making it well-suited for policy-oriented applications.
 
-# Fit the linear regression model
-model_poverty <- lm(predicted_no2 ~ Percent_Below_Poverty, data = data)
+The sociodemographic variables used in our analysis—language, race, and the percentage of individuals living above or below the federal poverty level (FPL)—offer both strengths and limitations. While these variables provide valuable insights into potential disparities in environmental exposures, there are notable weaknesses in their applicability. For instance, using the percentage of individuals below the FPL may not fully capture economic vulnerability in high-cost-of-living areas like ours. A more appropriate measure would have been 150% or 200% of the FPL, but such data were unavailable for our study. Similarly, the use of census tract racial and ethnic composition, while informative, is not the most meaningful metric for understanding systemic inequities; however, it was the best available data for our purposes. Despite these limitations, these variables still allow for a preliminary assessment of how environmental exposures may disproportionately affect marginalized populations.
 
-# Summarize the model
-summary(model_poverty)
+However, the study has several limitations that should be acknowledged. The exclusion of broader PM2.5 sources and protective land-use factors restricts the generalizability of the findings to other contexts or regions. The sociodemographic metrics used, such as federal poverty level thresholds and racial or ethnic percentages, may oversimplify the complexities of social dynamics and their interactions with environmental exposures. Furthermore, reliance on a single year of averaged monitoring data limits the ability to capture temporal variability in pollutant concentrations, potentially affecting the robustness of the exposure estimates over time. Ideally, we would have used all 29 observations from each stop location, which allows for finer temporal resolution and a wider range of measurements. Due to our computational constraints, we were not able to do so, as attempting to run the universal kriging model on the full data crashed our server repeatedly. If we had been able to use this data, we could have examined factors relevant to air pollution variability, such as seasons. Finally, the authors of the original mobile monitoring study noted that the study area’s generally low PM2.5 concentrations produced noisy readings near the nephelometers’ limit of detection, thus yielding unstable measurements (Bramble et al., 2023). Further study could obtain higher quality PM2.5 measurements. These limitations suggest areas for future refinement to enhance the comprehensiveness of the analysis.
 
-# Optional: Plot the relationship
-ggplot(data, aes(x = Percent_Below_Poverty, y = predicted_no2)) +
-  geom_point() +
-  geom_smooth(method = "lm", color = "blue") +
-  labs(
-    title = "Linear Regression: Predicted NO2 vs Below Poverty",
-    x = "Percent Below Poverty",
-    y = "Predicted NO2"
-  )
+# Author Contribution Statement
 
-```
+M.C.E. performed linear regressions, contributed to results tables, and wrote and contributed to the background, methods, results, and discussion sections. C.M. conducted data cleaning, UK predictions and maps, descriptive statistics of demographics, UK cross-validation, merged predictions with demographic variables, created tables, and contributed to the methods, results, and discussion sections. S.M. cleaned and merged data, linear regression analyses of predicted NO2 and its association with race, language diversity, and poverty, created descriptive maps on the census tract level, and contributed to the introduction, methods, results, and discussion sections. J.R.G. was responsible for data cleaning and merging, analyzing predicted PM2.5 and poverty, NO2 and poverty, conducting linear regressions, creating corresponding maps, and contributing to the methods, results, and discussion sections. K.T. was responsible for data cleaning, mapping study area pollutant concentrations, performing linear regressions on pollutants and demographic variables, developing results tables, and contributing to the results and discussion sections.  All authors contributed equally to selecting covariates, reviewing and critiquing the content, and preparing the final manuscript. Data cleaning was carried out by C.M., J.R.G., K.T., M.C.E., and S.M. Figures and tables were developed collaboratively. K.T. and C.M. did the final referencing and formatting.
 
-#Map of Predicted NO2 and poverty
+# Acknowledgments
 
-```{r, eval=FALSE}
-# Normalize NO2 and Poverty levels to a 0–1 range
-newgrid_king_county <- newgrid_king_county %>%
-  mutate(
-    no2_scaled = rescale(predicted_no2, to = c(0, 1)),  # Assuming `predicted_no2` is the column for NO2
-    poverty_scaled = rescale(Percent_Below_Poverty, to = c(0, 1)),
-    bivar_category = case_when(
-      no2_scaled <= 0.5 & poverty_scaled <= 0.5 ~ "low_low",
-      no2_scaled <= 0.5 & poverty_scaled > 0.5 ~ "low_high",
-      no2_scaled > 0.5 & poverty_scaled <= 0.5 ~ "high_low",
-      no2_scaled > 0.5 & poverty_scaled > 0.5 ~ "high_high"
-    )
-  )
-
-# Define a bivariate color palette
-bivariate_colors_no2 <- c(
-  "low_low" = "#f0f0f0",  # Low NO2, Low Poverty (light grey)
-  "low_high" = "#9ecae1",  # Low NO2, High Poverty (light blue)
-  "high_low" = "#fc9272",  # High NO2, Low Poverty (light red)
-  "high_high" = "#67000d"  # High NO2, High Poverty (dark red)
-)
-
-# Ensure CRS is consistent for mapping
-newgrid_king_county_filtered <- st_transform(newgrid_king_county, crs = 4326)
-
-# Plot the NO2 and Poverty map
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # OpenStreetMap basemap
-  geom_sf(
-    data = newgrid_king_county_filtered,
-    aes(fill = bivar_category),
-    color = NA,
-    alpha = 0.8
-  ) +
-  scale_fill_manual(
-    values = bivariate_colors_no2,
-    name = "NO2 & Poverty Levels",
-    breaks = c("low_low", "low_high", "high_low", "high_high"),  # Ensures the order matches the color definitions
-    labels = c(
-      "Low NO2, Low Poverty",   # Corresponds to "low_low"
-      "Low NO2, High Poverty",  # Corresponds to "low_high"
-      "High NO2, Low Poverty",  # Corresponds to "high_low"
-      "High NO2, High Poverty"  # Corresponds to "high_high"
-    )
-  ) +
-  labs(
-    title = "NO2 and Poverty Levels in King County, WA",
-    subtitle = "High NO2 and High Poverty areas are highlighted in dark red",
-    caption = "Data Sources: ACS, Mobile Monitoring, OpenStreetMap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 14, hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 1),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10),
-    legend.position = "right",  # Legend on the right-hand side
-    legend.box = "vertical",
-    panel.background = element_rect(fill = "transparent", color = NA)
-  )
-
-```
-
-#Linear regression of predicted NO2 and language diversity
-
-```{r, eval=FALSE}
-
-# Load the dataset
-data <- newgrid_king_county
-
-# Clean the data: Ensure columns are numeric and remove invalid values
-data <- data %>%
-  mutate(
-    predicted_no2 = as.numeric(as.character(predicted_no2)),
-    Language_other_than_English = as.numeric(as.character(Language_other_than_English))
-  ) %>%
-  filter(
-    !is.na(predicted_no2), 
-    !is.na(Language_other_than_English),
-    is.finite(predicted_no2), 
-    is.finite(Language_other_than_English)
-  )
-
-# Fit the linear regression model
-model <- lm(predicted_no2 ~ Language_other_than_English, data = data)
-
-# Summarize the model
-summary(model)
-
-# Optional: Plot the relationship
-ggplot(data, aes(x = Language_other_than_English, y = predicted_no2)) +
-  geom_point() +
-  geom_smooth(method = "lm", color = "blue") +
-  labs(
-    title = "Linear Regression: Predicted NO2 vs Language Other Than English",
-    x = "Language Other Than English",
-    y = "Predicted NO2"
-  )
-
-```
-
-```{r, eval=FALSE}
-# Ensure columns are numeric and remove invalid values
-newgrid_king_county <- newgrid_king_county %>%
-  mutate(
-    predicted_no2 = as.numeric(as.character(predicted_no2)),
-    Language_other_than_English = as.numeric(as.character(Language_other_than_English))
-  ) %>%
-  filter(
-    !is.na(predicted_no2), 
-    !is.na(Language_other_than_English),
-    is.finite(predicted_no2), 
-    is.finite(Language_other_than_English)
-  ) %>%
-  mutate(
-    no2_scaled = rescale(predicted_no2, to = c(0, 1)),
-    language_scaled = rescale(Language_other_than_English, to = c(0, 1)),
-    bivar_category = case_when(
-      no2_scaled <= 0.5 & language_scaled <= 0.5 ~ "low_low",
-      no2_scaled <= 0.5 & language_scaled > 0.5 ~ "low_high",
-      no2_scaled > 0.5 & language_scaled <= 0.5 ~ "high_low",
-      no2_scaled > 0.5 & language_scaled > 0.5 ~ "high_high"
-    )
-  )
-
-# Ensure it's an sf object and transform CRS
-if (!inherits(newgrid_king_county, "sf")) {
-  newgrid_king_county <- st_as_sf(newgrid_king_county, coords = c("longitude", "latitude"), crs = 4326)
-}
-newgrid_king_county_filtered <- st_transform(newgrid_king_county, crs = 4326)
-
-# Define the bivariate color palette
-bivariate_colors_no2 <- c(
-  "low_low" = "#f0f0f0", 
-  "low_high" = "#9ecae1", 
-  "high_low" = "#fc9272", 
-  "high_high" = "#67000d"
-)
-
-# Plot the map
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +
-  geom_sf(
-    data = newgrid_king_county_filtered,
-    aes(fill = bivar_category),
-    color = NA,
-    alpha = 0.8
-  ) +
-  scale_fill_manual(
-    values = bivariate_colors_no2,
-    name = "NO2 & Language Levels",
-    breaks = c("low_low", "low_high", "high_low", "high_high"),
-    labels = c(
-      "Low NO2, Low Language Diversity",
-      "Low NO2, High Language Diversity",
-      "High NO2, Low Language Diversity",
-      "High NO2, High Language Diversity"
-    )
-  ) +
-  labs(
-    title = "Predicted NO2 and Language Diversity",
-    caption = "Data Sources: ACS, Mobile Monitoring, OpenStreetMap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 1),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10),
-    legend.position = "right",
-    legend.box = "vertical",
-    panel.background = element_rect(fill = "transparent", color = NA)
-  )
-
-```
-
-```{r, eval=FALSE}
-# Load the dataset
-data <- newgrid_king_county
-
-# Clean the data: Ensure all relevant columns are numeric and remove invalid values
-data <- data %>%
-  mutate(
-    predicted_no2 = as.numeric(as.character(predicted_no2)),
-    White = as.numeric(as.character(White)),
-    Black_AfricanAmerican = as.numeric(as.character(Black_AfricanAmerican)),
-    AIAN = as.numeric(as.character(AIAN)),
-    Asian = as.numeric(as.character(Asian)),
-    Hawaiian_PacificIslander = as.numeric(as.character(Hawaiian_PacificIslander)),
-    Other_alone = as.numeric(as.character(Other_alone)),
-    X2ormore = as.numeric(as.character(X2ormore)),
-    X2ormore_andsomeother = as.numeric(as.character(X2ormore_andsomeother)),
-    X3ormore = as.numeric(as.character(X3ormore))
-  ) %>%
-  filter(
-    !is.na(predicted_no2),
-    is.finite(predicted_no2),
-    !is.na(White),
-    !is.na(Black_AfricanAmerican),
-    !is.na(AIAN),
-    !is.na(Asian),
-    !is.na(Hawaiian_PacificIslander),
-    !is.na(Other_alone),
-    !is.na(X2ormore),
-    !is.na(X2ormore_andsomeother),
-    !is.na(X3ormore)
-  )
-
-# Fit the multiple linear regression model (excluding `_ME` variables)
-model <- lm(predicted_no2 ~ White + 
-            Black_AfricanAmerican + 
-            AIAN + 
-            Asian + 
-            Hawaiian_PacificIslander + 
-            Other_alone + 
-            X2ormore + 
-            X2ormore_andsomeother + 
-            X3ormore,
-            data = data)
-
-# Summarize the model
-summary(model)
-
-# Extract the coefficients from the model
-model_summary <- summary(model)
-coefficients_table <- as.data.frame(model_summary$coefficients)
-
-# Rename columns for clarity
-colnames(coefficients_table) <- c("Estimate", "Std. Error", "t value", "Pr(>|t|)")
-
-# Add row names as a column for variable names
-coefficients_table <- tibble::rownames_to_column(coefficients_table, "Variable")
-
-# Print the table in the console
-print(coefficients_table)
-
-# Optional: Use kable for better visualization in RMarkdown or RStudio
-library(knitr)
-kable(coefficients_table, caption = "Regression Results for Predicted NO2 and Race Variables")
-
-
-# Optional: Diagnostics for the model
-par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
-plot(model)
-
-###Racial diversity - NOTE: size needs to be explored so maps are less squished
-
-#Text for write up: This map visualizes the racial and ethnic composition of King County, Washington, by census tract, with an OpenStreetMap background for spatial context. Each panel represents the percentage distribution of a specific racial or ethnic group, including American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. The color gradient indicates the concentration, with darker shades representing higher percentages. This visual provides a detailed geographic understanding of demographic patterns across the county. Data sources include ACS and OpenStreetMap.
-```
-
-```{r, eval=FALSE}
-# For adding OpenStreetMap tiles
-
-# Define the racial/ethnic variables and their readable names
-selected_race_vars <- c(
-  "Black_AfricanAmerican",
-  "White",
-  "Asian",
-  "AIAN",
-  "Hawaiian_PacificIslander",
-  "HispanicorLatino"
-)
-
-readable_race_names <- c(
-  "Black or African American",
-  "White",
-  "Asian",
-  "American Indian/Alaskan Native",
-  "Hawaiian or Pacific Islander",
-  "Hispanic or Latino"
-)
-
-# Ensure CRS is consistent for mapping
-newgrid_king_county <- st_transform(newgrid_king_county, crs = 4326)
-
-# Pivot dataset to long format for mapping multiple racial groups
-newgrid_long <- newgrid_king_county %>%
-  select(geometry, all_of(selected_race_vars)) %>%
-  pivot_longer(
-    cols = all_of(selected_race_vars),
-    names_to = "Race",
-    values_to = "Percentage"
-  ) %>%
-  mutate(
-    Race = recode(Race, 
-                  "Black_AfricanAmerican" = "Black or African American",
-                  "White" = "White",
-                  "Asian" = "Asian",
-                  "AIAN" = "American Indian/Alaskan Native",
-                  "Hawaiian_PacificIslander" = "Hawaiian or Pacific Islander",
-                  "HispanicorLatino" = "Hispanic or Latino")
-  )
-
-# Create the map with OpenStreetMap as the background
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # Add OpenStreetMap tiles as the base layer
-  geom_sf(
-    data = newgrid_long,
-    aes(fill = Percentage, geometry = geometry),
-    color = NA,
-    alpha = 0.8
-  ) +
-  facet_wrap(~ Race, ncol = 2) +  # Facet by race for multiple maps
-  scale_fill_viridis_c(
-    name = "Percentage",
-    option = "plasma",
-    na.value = "grey90"
-  ) +
-  labs(
-    title = "Spatial Distributon of Dominant Race per Census Tract",
-    caption = "Data Sources: ACS, OpenStreetMap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 10, face = "bold", hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 1),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10),
-    legend.position = "right",
-    panel.background = element_rect(fill = "transparent", color = NA)
-  )
-
-##Racial map choropleth
-#Text for write up: 
-#This map displays the dominant racial or ethnic group by census tract in Snohomish, Pierce, and King County, Washington, overlaid on an OpenStreetMap basemap for geographic context. Each tract is color-coded to represent the racial or ethnic group with the highest proportion of residents. Groups represented include American Indian/Alaskan Native, Asian, Black or African American, Hawaiian or Pacific Islander, Hispanic or Latino, and White. This visualization highlights the spatial distribution of demographic dominance across the county, providing insights into the region's racial and ethnic diversity. Data sources include the American Community Survey (ACS), Mobile Monitoring, and OpenStreetMap.
-```
-
-```{r, eval=FALSE}
-# For adding OpenStreetMap tiles
-
-# Ensure CRS consistency for OpenStreetMap compatibility
-newgrid_king_county <- st_transform(newgrid_king_county, crs = 4326)
-
-# Normalize racial/ethnic data to 0–1 range
-newgrid_normalized <- newgrid_king_county %>%
-  mutate(across(all_of(selected_race_vars), ~ rescale(.x, to = c(0, 1))))
-
-# Identify the dominant race in each tract
-newgrid_normalized <- newgrid_normalized %>%
-  rowwise() %>%
-  mutate(
-    dominant_race = selected_race_vars[which.max(c_across(all_of(selected_race_vars)))]
-  ) %>%
-  ungroup() %>%
-  mutate(
-    dominant_race = recode(dominant_race,
-                           "Black_AfricanAmerican" = "Black or African American",
-                           "White" = "White",
-                           "Asian" = "Asian",
-                           "AIAN" = "American Indian/Alaskan Native",
-                           "Hawaiian_PacificIslander" = "Hawaiian or Pacific Islander",
-                           "HispanicorLatino" = "Hispanic or Latino")
-  )
-
-# Assign colors for each dominant race
-race_colors <- c(
-  "Black or African American" = "#fc9272",   # Light red
-  "White" = "#f0f0f0",                       # Light grey
-  "Asian" = "#9ecae1",                       # Light blue
-  "American Indian/Alaskan Native" = "#a1d99b",  # Light green
-  "Hawaiian or Pacific Islander" = "#bcbddc",    # Light purple
-  "Hispanic or Latino" = "#fdae6b"           # Light orange
-)
-
-# Plot the map using OpenStreetMap tiles
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # Add OpenStreetMap tiles as the base layer
-  geom_sf(
-    data = newgrid_normalized,
-    aes(fill = dominant_race),
-    color = NA,
-    alpha = 0.8
-  ) +
-  scale_fill_manual(
-    values = race_colors,
-    name = "Prominent Race"
-  ) +
-  labs(
-    title = "Spatial Distribution of Race by Census Tract",
-    subtitle = "Dominant racial group per census tract",
-    caption = "Data Sources: ACS, OpenStreetMap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 14, hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 1),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10),
-    legend.position = "right",
-    panel.background = element_rect(fill = "transparent", color = NA)
-  )
-
-```
-
-```{r, eval=FALSE}
-# For adding OpenStreetMap tiles
-
-# Define the language variables and their readable names
-selected_language_vars <- c(
-  "English_only",
-  "Language_other_than_English"
-)
-
-readable_language_names <- c(
-  "English Only",
-  "Language Other Than English"
-)
-
-# Ensure CRS is consistent for mapping
-newgrid_king_county <- st_transform(newgrid_king_county, crs = 4326)
-
-# Pivot dataset to long format for mapping language groups
-newgrid_long_language <- newgrid_king_county %>%
-  select(geometry, all_of(selected_language_vars)) %>%
-  pivot_longer(
-    cols = all_of(selected_language_vars),
-    names_to = "Language",
-    values_to = "Percentage"
-  ) %>%
-  mutate(
-    Language = recode(Language, 
-                      "English_only" = "English Only",
-                      "Language_other_than_English" = "Language Other Than English")
-  )
-
-# Create the map with OpenStreetMap as the background
-ggplot() +
-  annotation_map_tile(type = "osm", zoom = 10) +  # Add OpenStreetMap tiles as the base layer
-  geom_sf(
-    data = newgrid_long_language,
-    aes(fill = Percentage, geometry = geometry),
-    color = NA,
-    alpha = 0.8
-  ) +
-  facet_wrap(~ Language, ncol = 2) +  # Facet by language group
-  scale_fill_viridis_c(
-    name = "Percentage",
-    option = "plasma",
-    na.value = "grey90"
-  ) +
-  labs(
-    title = "Spatial Distribution of Language Diversity by Census Tract",
-    caption = "Data Sources: ACS, OpenStreetMap",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-    plot.caption = element_text(size = 10, hjust = 1),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10),
-    legend.position = "right",
-    panel.background = element_rect(fill = "transparent", color = NA)
-  )
-
-##Language diversity
-#Text for write up: 
-#This map visualizes language use at home by census tract in Snohomish, Pierce, and King County, Washington, with an OpenStreetMap background for geographic context. The two panels represent the percentage distribution of households where English is the primary language ("English Only") and households where other languages are predominantly spoken ("Language Other Than English").
-
-#The left panel highlights areas where English is predominantly spoken, with darker shades indicating higher percentages. The right panel illustrates areas where other languages dominate, showing significant linguistic diversity across the region. The color gradient reflects the proportion of households, from lower percentages in blue to higher percentages in yellow. This map provides insights into the spatial distribution of language use in the county. Data sources include the American Community Survey (ACS) and OpenStreetMap.
-
-```
+We thank Dr. Lianne Sheppard and Dr. Magali Blanco for their guidance, feedback, and support throughout this past quarter. We also want to thank Brian High from DEOHS IT for his technical expertise and assistance, which were instrumental in this work.
 
 # Appendix 1: Supplementary Results
 
@@ -2031,6 +1552,8 @@ no2_map_stop + pm25_map_stop + plot_annotation(title = 'Map of Study Area Stop C
 ```
 
 ## NO2 Variograms and UK Predictions
+
+When attempting to fit a variogram using a data set with all 29 pollutant measurements at each stop location, the variogram appeared as though there was not an expected relationship between distance and semi-variance. We suppose this was due to the multiple observations at each stop location rendering semi-variance values based on distances between measurements at the same location, which would be zero, and the inability of our variogram function to handle time-series data. Additionally, when we attempted to run the UK model based on this variogram, it either crashed the server or never finished running, even after leaving the model running for over an hour.
 
 ```{r variogram.plots.no2.appendix}
 # ggplot(vgm_no2_annual, aes(x = dist, y=gamma)) + 
@@ -2183,6 +1706,111 @@ pm_univar_res %>%
     bootstrap_options = c("striped", "hover", "condensed")
   )
 ```
+
+## Map of linguistic diversity for study area
+
+```{r}
+# For adding OpenStreetMap tiles
+
+# Define the language variables and their readable names
+selected_language_vars <- c(
+  "p_engl_only",
+  "p_lang_other"
+)
+
+readable_language_names <- c(
+  "English Only",
+  "Language Other Than English"
+)
+
+# Ensure CRS is consistent for mapping
+full_data_w_preds_perc_spatial <- st_transform(full_data_w_preds_perc_spatial, crs = 4326)
+
+# Pivot dataset to long format for mapping language groups
+full_data_w_preds_perc_spatial <- full_data_w_preds_perc_spatial %>%
+  select(geometry, all_of(selected_language_vars)) %>%
+  pivot_longer(
+    cols = all_of(selected_language_vars),
+    names_to = "Language",
+    values_to = "Percentage"
+  ) %>%
+  mutate(
+    Language = recode(Language, 
+                      "English_only" = "English Only",
+                      "Language_other_than_English" = "Language Other Than English")
+  )
+
+# Create the map with OpenStreetMap as the background
+ggplot() +
+  annotation_map_tile(type = "osm", zoom = 10) +  # Add OpenStreetMap tiles as the base layer
+  geom_sf(
+    data = full_data_w_preds_perc_spatial,
+    aes(fill = Percentage, geometry = geometry),
+    color = NA,
+    alpha = 0.8
+  ) +
+  facet_wrap(~ Language, ncol = 2) +  # Facet by language group
+  scale_fill_viridis_c(
+    name = "Percentage",
+    option = "plasma",
+    na.value = "grey90"
+  ) +
+  labs(
+    title = "Spatial Distribution of Language Diversity by Census Tract",
+    caption = "Data Sources: ACS, OpenStreetMap",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.caption = element_text(size = 10, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = "right",
+    panel.background = element_rect(fill = "transparent", color = NA)
+  )
+```
+
+# References
+
+Allen, R. W., Davies, H., Cohen, M. A., Mallach, G., Kaufman, J. D., & Adar, S. D. (2009). The spatial relationship between traffic-generated air pollution and noise in 2 US cities. Environmental Research, 109(3), 334–342. <https://doi.org/10.1016/j.envres.2008.12.006>
+
+Blanco, M. N., Gassett, A., Gould, T., Doubleday, A., Slager, D. L., Austin, E., Seto, E., Larson, T. V., Marshall, J. D., & Sheppard, L. (2022). Characterization of annual average traffic-related air pollution concentrations in the greater Seattle area from a year-long mobile monitoring campaign. Environmental Science & Technology, 56(16), 11460–11472. <https://doi.org/10.1021/acs.est.2c01077>
+
+Blanco, M., & Sheppard, L. (2024). ACT-AP Mobile Monitoring [Dataset]. Zenodo. <https://doi.org/10.5281/ZENODO.13761282>
+
+Bramble, K., Blanco, M. N., Doubleday, A., Gassett, A. J., Hajat, A., Marshall, J. D., & Sheppard, L. (2023). Exposure disparities by income, race and ethnicity, and historic redlining grade in the greater Seattle area for ultrafine particles and other air pollutants. Environmental Health Perspectives, 131(7), 77004. <https://doi.org/10.1289/EHP11662>
+
+Chi, G. C., Hajat, A., Bird, C. E., Cullen, M. R., Griffin, B. A., Miller, K. A., Shih, R. A., Stefanick, M. L., Vedal, S., Whitsel, E. A., & Kaufman, J. D. (2016). Individual and neighborhood socioeconomic status and the association between air pollution and cardiovascular disease. Environmental Health Perspectives, 124(12), 1840–1847. <https://doi.org/10.1289/EHP199>
+
+Clark, L. P., Millet, D. B., & Marshall, J. D. (2017). Changes in transportation-related air pollution exposures by race-ethnicity and socioeconomic status: Outdoor nitrogen dioxide in the United States in 2000 and 2010. Environmental Health Perspectives, 125(9), 097012. <https://doi.org/10.1289/EHP959>
+
+Clean Air Act Amendments of 1990, 1630, Senate 101st Congress (1990). <https://www.congress.gov/bill/101st-congress/senate-bill/1630/text>
+
+Gregory, J. (n.d.). Seattle’s Race and Segregation Story in Maps 1920-2020 - Seattle Civil Rights and Labor History Project. University of Washington. Retrieved December 8, 2024, from <https://depts.washington.edu/civilr/segregation_maps.htm>
+
+Groover, H. (2024, June 28). As WA housing costs climb, incomes aren’t keeping up. The Seattle Times. <https://www.seattletimes.com/business/real-estate/as-wa-housing-costs-climb-incomes-arent-keeping-up/>
+
+Hong, G., & Jee, Y.-K. (2020). Special issue on ultrafine particles: where are they from and how do they affect us? Experimental & Molecular Medicine, 52(3), 309–310. <https://doi.org/10.1038/s12276-020-0395-z>
+
+Loopmans, M., Smits, L., & Kenis, A. (2022). Rethinking environmental justice: capability building, public knowledge and the struggle against traffic-related air pollution. Environment and Planning C Politics and Space, 40(3), 705–723. <https://doi.org/10.1177/23996544211042876>
+
+McDuffie, E. E., Martin, R. V., Spadaro, J. V., Burnett, R., Smith, S. J., O’Rourke, P., Hammer, M. S., van Donkelaar, A., Bindle, L., Shah, V., Jaeglé, L., Luo, G., Yu, F., Adeniran, J. A., Lin, J., & Brauer, M. (2021). Source sector and fuel contributions to ambient PM2.5 and attributable mortality across multiple spatial scales. Nature Communications, 12(1), 3594. <https://doi.org/10.1038/s41467-021-23853-y>
+
+Mercer, L. D., Szpiro, A. A., Sheppard, L., Lindström, J., Adar, S. D., Allen, R. W., Avol, E. L., Oron, A. P., Larson, T., Liu, L.-J. S., & Kaufman, J. D. (2011). Comparing universal kriging and land-use regression for predicting concentrations of gaseous oxides of nitrogen (NOx) for the Multi-Ethnic Study of Atherosclerosis and Air Pollution (MESA Air). Atmospheric Environment (Oxford, England: 1994), 45(26), 4412–4420. <https://doi.org/10.1016/j.atmosenv.2011.05.043>
+
+NAAQS Table. (2024, February 7). EPA. <https://www.epa.gov/criteria-air-pollutants/naaqs-table>
+
+Nitrogen Dioxide (NO2). (2016, July 6). EPA. <https://www.epa.gov/no2-pollution/basic-information-about-no2>
+
+Particulate Matter (PM). (2016, April 26). EPA. <https://www.epa.gov/pm-pollution/health-and-environmental-effects-particulate-matter-pm>
+
+Rubio, R., Grineski, S., & Collins, T. (2021). Children’s exposure to vehicular air pollution in the United States: environmental injustices at the intersection of race/ethnicity and language. Environmental Sociology, 7(3), 187–199. <https://doi.org/10.1080/23251042.2021.1878574>
+
+U.S. Census Bureau. (n.d.). Census Bureau Data. Retrieved December 8, 2024, from <https://data.census.gov/>
+
+U.S. Environmental Protection Agency. (2013, March 20). <https://www.epa.gov/home>
 
 # Appendix 2
 
